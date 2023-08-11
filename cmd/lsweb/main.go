@@ -3,43 +3,47 @@ package main
 import (
 	"flag"
 	"fmt"
-	"lsweb/downloader"
-	"lsweb/parser"
-	"os"
+
+	"github.com/hemzaz/lsweb/pkg/downloader"
+	"github.com/hemzaz/lsweb/pkg/parser"
 )
 
-func main() {
-	// Define CLI flags
-	listFlag := flag.Bool("L", false, "List downloadable links")
-	downloadFlag := flag.Bool("D", false, "Download the files")
-	simFlag := flag.Bool("S", false, "Download simultaneously")
-	outputFlag := flag.String("O", "text", "Output format: json, txt, num, html")
-	fileFlag := flag.String("F", "", "File to write the output")
+var (
+	urlFlag      string
+	listFlag     bool
+	downloadFlag bool
+	simFlag      bool
+	outputFlag   string
+	fileFlag     string
+)
 
-	// Parse the flags
+func init() {
+	flag.StringVar(&urlFlag, "url", "", "The URL to target.")
+	flag.BoolVar(&listFlag, "L", false, "List downloadable links. Default action when no flag is provided.")
+	flag.BoolVar(&downloadFlag, "D", false, "Download the files. Default to non-simultaneously.")
+	flag.BoolVar(&simFlag, "S", false, "Download simultaneously. Use with -D flag.")
+	flag.StringVar(&outputFlag, "O", "text", "Output format. Defaults to text. Options: json, txt, num, html.")
+	flag.StringVar(&fileFlag, "F", "", "File to write the output to.")
+}
+
+func main() {
 	flag.Parse()
 
-	// Get the URL argument
-	if len(flag.Args()) < 1 {
-		fmt.Println("Error: URL not provided.")
-		os.Exit(1)
+	if urlFlag == "" {
+		fmt.Println("Please provide a URL using the -url flag.")
+		return
 	}
-	url := flag.Args()[0]
 
-	// Extract links from the URL
-	links := parser.ExtractLinks(url)
-
-	// Handle the flags
-	if *listFlag || len(flag.Args()) == 1 {
-		// Display the links
+	if listFlag || (!listFlag && !downloadFlag) {
+		links := parser.ExtractLinks(urlFlag)
+		// Display links based on the output format specified
 		for _, link := range links {
 			fmt.Println(link)
 		}
-	} else if *downloadFlag {
-		// Download the files
-		downloader.DownloadFiles(links, *simFlag)
 	}
 
-	// Handle the output format and file output
-	// This can be enhanced further based on the desired output format and file handling.
+	if downloadFlag {
+		links := parser.ExtractLinks(urlFlag)
+		downloader.DownloadFiles(links, simFlag)
+	}
 }
