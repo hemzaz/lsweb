@@ -1,0 +1,16 @@
+project_name: lsweb
+builds:
+- id: lsweb
+  main: ./cmd/lsweb/main.go
+  binary: lsweb
+  goos:
+  - linux
+  - darwin
+archives:
+- id: lsweb
+  builds:
+  - lsweb
+  format: tar.gz
+  files:
+  - LICENSE
+  - README.md
