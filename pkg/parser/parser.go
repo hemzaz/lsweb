@@ -2,6 +2,7 @@ package parser
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 
@@ -25,6 +26,7 @@ func ExtractLinks(targetURL string) ([]string, error) {
 	}
 
 	var links []string
+	var malformedURLs []string
 	var f func(*html.Node)
 	f = func(n *html.Node) {
 		if n.Type == html.ElementNode && n.Data == "a" {
@@ -32,10 +34,12 @@ func ExtractLinks(targetURL string) ([]string, error) {
 				if a.Key == "href" {
 					// Convert relative URLs to absolute URLs
 					absoluteURL, err := url.Parse(a.Val)
-					if err == nil {
-						absoluteURL = resp.Request.URL.ResolveReference(absoluteURL)
-						links = append(links, absoluteURL.String())
+					if err != nil {
+						malformedURLs = append(malformedURLs, a.Val)
+						continue
 					}
+					absoluteURL = resp.Request.URL.ResolveReference(absoluteURL)
+					links = append(links, absoluteURL.String())
 				}
 			}
 		}
@@ -44,5 +48,10 @@ func ExtractLinks(targetURL string) ([]string, error) {
 		}
 	}
 	f(doc)
+
+	if len(malformedURLs) > 0 {
+		return links, fmt.Errorf("malformed URLs detected: %v", malformedURLs)
+	}
+
 	return links, nil
 }

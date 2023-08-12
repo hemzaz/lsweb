@@ -12,7 +12,9 @@ import (
 	"github.com/schollz/progressbar/v3"
 )
 
-const MaxConcurrentDownloads = 5
+const MaxConcurrentDownloads = 255
+
+var errorsMutex sync.Mutex
 
 func DownloadFiles(urls []string, simultaneously bool) error {
 	if simultaneously {
@@ -40,7 +42,9 @@ func downloadFilesConcurrently(urls []string) error {
 			sem <- struct{}{}
 			err := downloadFile(u)
 			if err != nil {
+				errorsMutex.Lock()
 				errors = append(errors, fmt.Errorf("failed to download %s concurrently: %w", u, err))
+				errorsMutex.Unlock()
 			}
 			<-sem
 		}(url)
@@ -68,6 +72,9 @@ func downloadFile(url string) error {
 	}
 
 	filename := filepath.Base(url)
+	if _, err := os.Stat(filename); !os.IsNotExist(err) {
+		filename = "new_" + filename
+	}
 	out, err := os.Create(filename)
 	if err != nil {
 		return fmt.Errorf("failed to create file %s: %w", filename, err)

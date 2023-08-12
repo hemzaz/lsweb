@@ -20,7 +20,7 @@ var (
 )
 
 func init() {
-	flag.StringVar(&urlFlag, "url", "", "The URL to target.")
+	flag.StringVar(&urlFlag, "url", "", "The target URL to fetch and list/download files from.")
 	flag.BoolVar(&listFlag, "L", false, "List downloadable links. Default action when no flag is provided.")
 	flag.BoolVar(&downloadFlag, "D", false, "Download the files. Default to non-simultaneously.")
 	flag.BoolVar(&simFlag, "S", false, "Download simultaneously. Use with -D flag.")
@@ -36,23 +36,17 @@ func main() {
 		return
 	}
 
-	if listFlag || (!listFlag && !downloadFlag) {
-		links, err := parser.ExtractLinks(urlFlag)
-		if err != nil {
-			fmt.Println("Error extracting links:", err)
-			return
-		}
+	links, err := parser.ExtractLinks(urlFlag)
+	if err != nil {
+		fmt.Println("Error extracting links:", err)
+		return
+	}
 
-		// Display links based on the output format specified
+	if listFlag || (!listFlag && !downloadFlag) {
 		displayLinks(links)
 	}
 
 	if downloadFlag {
-		links, err := parser.ExtractLinks(urlFlag)
-		if err != nil {
-			fmt.Println("Error extracting links:", err)
-			return
-		}
 		downloader.DownloadFiles(links, simFlag)
 	}
 }
@@ -60,7 +54,11 @@ func main() {
 func displayLinks(links []string) {
 	switch outputFlag {
 	case "json":
-		data, _ := json.Marshal(links)
+		data, err := json.Marshal(links)
+		if err != nil {
+			fmt.Println("Error marshaling links to JSON:", err)
+			return
+		}
 		fmt.Println(string(data))
 	case "txt":
 		for _, link := range links {
@@ -87,13 +85,21 @@ func displayLinks(links []string) {
 		var content string
 		switch outputFlag {
 		case "json":
-			data, _ := json.Marshal(links)
+			data, err := json.Marshal(links)
+			if err != nil {
+				fmt.Println("Error marshaling links to JSON:", err)
+				return
+			}
 			content = string(data)
 		case "txt", "num", "html":
 			for _, link := range links {
 				content += link + "\n"
 			}
 		}
-		ioutil.WriteFile(fileFlag, []byte(content), 0644)
+		err := ioutil.WriteFile(fileFlag, []byte(content), 0644)
+		if err != nil {
+			fmt.Println("Error writing to file:", err)
+			return
+		}
 	}
 }
