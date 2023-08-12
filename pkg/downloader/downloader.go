@@ -2,30 +2,85 @@ package downloader
 
 import (
 	"fmt"
-	// other necessary imports for downloading
+	"io"
+	"log"
+	"net/http"
+	"os"
+	"path/filepath"
+	"sync"
+
+	"github.com/schollz/progressbar/v3"
 )
 
-// DownloadFiles downloads the provided links.
-// If the 'simultaneous' flag is true, it will download the files simultaneously.
-func DownloadFiles(links []string, simultaneous bool) {
-	if simultaneous {
-		DownloadFilesSimultaneously(links)
-		return
+const MaxConcurrentDownloads = 5
+
+func DownloadFiles(urls []string, simultaneously bool) error {
+	if simultaneously {
+		return downloadFilesConcurrently(urls)
 	}
-	// Logic for non-simultaneous download
-	for _, link := range links {
-		// Download logic for each link
-		fmt.Println("Downloading:", link)
+	for _, url := range urls {
+		err := downloadFile(url)
+		if err != nil {
+			log.Printf("Failed to download %s: %v", url, err)
+			return fmt.Errorf("failed to download %s: %w", url, err)
+		}
 	}
+	return nil
 }
 
-// DownloadFilesSimultaneously downloads the provided links simultaneously.
-func DownloadFilesSimultaneously(links []string) {
-	// Logic for simultaneous download
-	for _, link := range links {
-		go func(link string) {
-			// Download logic for each link
-			fmt.Println("Simultaneously downloading:", link)
-		}(link)
+func downloadFilesConcurrently(urls []string) error {
+	sem := make(chan struct{}, MaxConcurrentDownloads)
+	var wg sync.WaitGroup
+	var errors []error
+
+	for _, url := range urls {
+		wg.Add(1)
+		go func(u string) {
+			defer wg.Done()
+			sem <- struct{}{}
+			err := downloadFile(u)
+			if err != nil {
+				errors = append(errors, fmt.Errorf("failed to download %s concurrently: %w", u, err))
+			}
+			<-sem
+		}(url)
 	}
+	wg.Wait()
+
+	if len(errors) > 0 {
+		for _, err := range errors {
+			log.Println(err)
+		}
+		return fmt.Errorf("multiple errors occurred during concurrent downloads: %v", errors[0]) // return the first error for simplicity
+	}
+	return nil
+}
+
+func downloadFile(url string) error {
+	resp, err := http.Get(url)
+	if err != nil {
+		return fmt.Errorf("failed to fetch %s: %w", url, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to download %s: HTTP %d", url, resp.StatusCode)
+	}
+
+	filename := filepath.Base(url)
+	out, err := os.Create(filename)
+	if err != nil {
+		return fmt.Errorf("failed to create file %s: %w", filename, err)
+	}
+	defer out.Close()
+
+	bar := progressbar.DefaultBytes(
+		resp.ContentLength,
+		"downloading",
+	)
+	_, err = io.Copy(io.MultiWriter(out, bar), resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to write to file %s: %w", filename, err)
+	}
+	return nil
 }

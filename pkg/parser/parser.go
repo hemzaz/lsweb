@@ -1,21 +1,27 @@
 package parser
 
 import (
+	"errors"
 	"net/http"
+	"net/url"
 
 	"golang.org/x/net/html"
 )
 
-func ExtractLinks(url string) []string {
-	resp, err := http.Get(url)
+func ExtractLinks(targetURL string) ([]string, error) {
+	resp, err := http.Get(targetURL)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New("failed to fetch the webpage")
+	}
+
 	doc, err := html.Parse(resp.Body)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 
 	var links []string
@@ -24,7 +30,12 @@ func ExtractLinks(url string) []string {
 		if n.Type == html.ElementNode && n.Data == "a" {
 			for _, a := range n.Attr {
 				if a.Key == "href" {
-					links = append(links, a.Val)
+					// Convert relative URLs to absolute URLs
+					absoluteURL, err := url.Parse(a.Val)
+					if err == nil {
+						absoluteURL = resp.Request.URL.ResolveReference(absoluteURL)
+						links = append(links, absoluteURL.String())
+					}
 				}
 			}
 		}
@@ -33,5 +44,5 @@ func ExtractLinks(url string) []string {
 		}
 	}
 	f(doc)
-	return links
+	return links, nil
 }
