@@ -1,120 +1,103 @@
 package main
 
 import (
-	"encoding/json"
-	"flag"
 	"fmt"
-	"io/ioutil"
-	"net/http"
-	"strings"
+	"log"
+	"os"
 
 	"github.com/hemzaz/lsweb/pkg/downloader"
 	"github.com/hemzaz/lsweb/pkg/parser"
+	"github.com/urfave/cli/v2"
 )
-
-var (
-	urlFlag      string
-	listFlag     bool
-	downloadFlag bool
-	simFlag      bool
-	outputFlag   string
-	fileFlag     string
-	ghFlag       bool
-)
-
-func init() {
-	flag.StringVar(&urlFlag, "url", "", "the URL we are targeting")
-	flag.BoolVar(&listFlag, "L", false, "list downloadable links")
-	flag.BoolVar(&downloadFlag, "D", false, "download the files")
-	flag.BoolVar(&simFlag, "S", false, "download simultaneously")
-	flag.StringVar(&outputFlag, "O", "txt", "output format")
-	flag.StringVar(&fileFlag, "F", "", "file to write the output")
-	flag.BoolVar(&ghFlag, "gh", false, "fetch all releases from a GitHub URL")
-	flag.Parse()
-}
-
-func fetchGitHubReleases(repoURL string) ([]string, error) {
-	parts := strings.Split(repoURL, "/")
-	if len(parts) < 5 {
-		return nil, fmt.Errorf("invalid GitHub URL")
-	}
-	user, repo := parts[3], parts[4]
-
-	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases", user, repo)
-	resp, err := http.Get(apiURL)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	var releases []struct {
-		Assets []struct {
-			BrowserDownloadURL string `json:"browser_download_url"`
-		} `json:"assets"`
-	}
-
-	if err := json.Unmarshal(body, &releases); err != nil {
-		return nil, err
-	}
-
-	var downloadLinks []string
-	for _, release := range releases {
-		for _, asset := range release.Assets {
-			downloadLinks = append(downloadLinks, asset.BrowserDownloadURL)
-		}
-	}
-
-	return downloadLinks, nil
-}
 
 func main() {
-	if ghFlag {
-		links, err := fetchGitHubReleases(urlFlag)
-		if err != nil {
-			fmt.Println("Error fetching GitHub releases:", err)
-			return
-		}
+	app := &cli.App{
+		Name:  "lsweb",
+		Usage: "List all links from a web page",
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:     "url",
+				Aliases:  []string{"u"},
+				Usage:    "URL to extract links from",
+				Required: true,
+			},
+			&cli.BoolFlag{
+				Name:    "download",
+				Aliases: []string{"d"},
+				Usage:   "Download files from the extracted links",
+			},
+			&cli.BoolFlag{
+				Name:    "simultaneous",
+				Aliases: []string{"s"},
+				Usage:   "Download files simultaneously",
+			},
+			&cli.BoolFlag{
+				Name:    "ignore-cert",
+				Aliases: []string{"ic"},
+				Usage:   "Ignore SSL certificate verification",
+			},
+			&cli.BoolFlag{
+				Name:  "gh",
+				Usage: "Fetch releases from a GitHub repository",
+			},
+			&cli.StringFlag{
+				Name:    "output",
+				Aliases: []string{"O"},
+				Usage:   "Specify the output format. Available formats: json, txt, num, html. Default is txt",
+				Value:   "txt",
+			},
+		},
+		Action: func(c *cli.Context) error {
+			url := c.String("url")
+			downloadFlag := c.Bool("download")
+			simFlag := c.Bool("simultaneous")
+			ignoreCertFlag := c.Bool("ignore-cert")
+			ghFlag := c.Bool("gh")
+			outputFormat := c.String("output")
 
-		if listFlag || (!listFlag && !downloadFlag) {
-			// Print the links
+			var links []string
+			var err error
+
+			if ghFlag {
+				links, err = downloader.FetchGitHubReleases(url)
+				if err != nil {
+					return err
+				}
+			} else {
+				links, err = parser.ExtractLinksFromURL(url, ignoreCertFlag)
+				if err != nil {
+					return err
+				}
+			}
+
 			for _, link := range links {
 				fmt.Println(link)
 			}
-		}
 
-		if downloadFlag {
-			if simFlag {
-				downloader.DownloadFilesSimultaneously(links)
-			} else {
-				downloader.DownloadFiles(links, true)
+			if outputFormat != "" {
+				err = parser.SaveLinksToFile(links, outputFormat)
+				if err != nil {
+					return fmt.Errorf("failed to save links to file: %v", err)
+				}
 			}
-		}
-		return
+
+			if downloadFlag {
+				if simFlag {
+					err = downloader.DownloadFilesSimultaneously(links, ignoreCertFlag)
+				} else {
+					err = downloader.DownloadFiles(links, ignoreCertFlag)
+				}
+				if err != nil {
+					return err
+				}
+			}
+
+			return nil
+		},
 	}
 
-	links, err := parser.ExtractLinks(urlFlag)
+	err := app.Run(os.Args)
 	if err != nil {
-		fmt.Println("Error extracting links:", err)
-		return
-	}
-
-	if listFlag || (!listFlag && !downloadFlag) {
-		// Print the links
-		for _, link := range links {
-			fmt.Println(link)
-		}
-	}
-
-	if downloadFlag {
-		if simFlag {
-			downloader.DownloadFilesSimultaneously(links)
-		} else {
-			downloader.DownloadFiles(links, true)
-		}
+		log.Fatal(err)
 	}
 }
