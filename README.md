@@ -55,22 +55,22 @@ lsweb [flags] <url>
 
 1. List downloadable links from a website:
    ```bash
-   lsweb -L https://example.com
+   lsweb -L --url https://example.com
    ```
 
 2. Download files from a website:
    ```bash
-   lsweb -D https://example.com
+   lsweb -D --url https://example.com
    ```
 
 3. Download files simultaneously:
    ```bash
-   lsweb -D -S https://example.com
+   lsweb -D -S --url https://example.com
    ```
 
 4. List GitHub release assets:
    ```bash
-   lsweb --gh https://github.com/telegramdesktop/tdesktop/releases/tag/v4.8.10
+   lsweb --gh --url https://github.com/telegramdesktop/tdesktop/releases/tag/v4.8.10
    ```
 
 ## Contributing
