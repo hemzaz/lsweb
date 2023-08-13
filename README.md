@@ -77,6 +77,11 @@ lsweb [flags] <url>
 
 Contributions are welcome! Please feel free to submit a pull request or open an issue.
 
+## TODO  
+
+1. add --limit flag
+2. add --filter flag (user regex to filter files)
+
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
