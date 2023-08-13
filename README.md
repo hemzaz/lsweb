@@ -73,6 +73,10 @@ lsweb [flags] <url>
    lsweb --gh --url https://github.com/telegramdesktop/tdesktop/releases/tag/v4.8.10
    ```
 
+
+https://github.com/hemzaz/lsweb/assets/1830915/b2a071b8-56f9-42c9-b9cd-b2e83a1448b0
+
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a pull request or open an issue.
