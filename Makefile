@@ -17,6 +17,11 @@ build: deps
 	@echo "Building $(BINARY_NAME) version $(VERSION) using goreleaser..."
 	goreleaser build --snapshot --rm-dist
 
+# Format all Go files
+fmt:
+	@echo "Formatting all Go files..."
+	go fmt ./...
+
 # Clean up
 clean:
 	@echo "Cleaning up..."
@@ -38,8 +43,9 @@ help:
 	@echo "  all (default)   - Fetch dependencies and build the project"
 	@echo "  deps            - Fetch all dependencies"
 	@echo "  build           - Build the project using goreleaser"
+	@echo "  fmt             - Format all Go files"
 	@echo "  clean           - Clean up"
 	@echo "  install-goreleaser - Install goreleaser if not installed"
 	@echo "  help            - Display this help"
 
-.PHONY: all deps build clean install-goreleaser help
+.PHONY: all deps build fmt clean install-goreleaser help
