@@ -81,6 +81,7 @@ Contributions are welcome! Please feel free to submit a pull request or open an 
 
 1. add --limit flag
 2. add --filter flag (user regex to filter files)
+3. add --ic flag (ignore certificate)
 
 ## License
 
