@@ -3,7 +3,6 @@ package parser
 import (
 	"crypto/tls"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,21 +10,17 @@ import (
 	"regexp"
 )
 
-var LinkRegex = regexp.MustCompile(`https?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*(),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+`)
+var LinkRegex = regexp.MustCompile(`http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+`)
 
-func ExtractLinksFromWebPage(body []byte) []string {
-	links := LinkRegex.FindAllString(string(body), -1)
-	return links
-}
-
+// ExtractLinksFromURL fetches the content of a URL and extracts all links from it.
 func ExtractLinksFromURL(url string, ignoreCert bool) ([]string, error) {
-	client := &http.Client{}
-	if ignoreCert {
-		tr := &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		}
-		client = &http.Client{Transport: tr}
+	var links []string
+
+	// Create an HTTP client that ignores certificate errors if the flag is set.
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: ignoreCert},
 	}
+	client := &http.Client{Transport: tr}
 
 	resp, err := client.Get(url)
 	if err != nil {
@@ -38,45 +33,67 @@ func ExtractLinksFromURL(url string, ignoreCert bool) ([]string, error) {
 		return nil, err
 	}
 
-	links := ExtractLinksFromWebPage(body)
+	matches := LinkRegex.FindAllString(string(body), -1)
+	for _, match := range matches {
+		links = append(links, match)
+	}
+
 	return links, nil
 }
 
-func SaveLinksToFile(links []string, format string) error {
-	var data []byte
-	var err error
-
-	switch format {
-	case "json":
-		data, err = json.Marshal(links)
-		if err != nil {
-			return err
-		}
-	case "txt":
-		for _, link := range links {
-			data = append(data, link...)
-			data = append(data, '\n')
-		}
-	case "num":
-		for i, link := range links {
-			line := fmt.Sprintf("%d. %s\n", i+1, link)
-			data = append(data, line...)
-		}
-	case "html":
-		data = []byte("<html><body><ul>")
-		for _, link := range links {
-			line := fmt.Sprintf("<li><a href='%s'>%s</a></li>", link, link)
-			data = append(data, line...)
-		}
-		data = append(data, []byte("</ul></body></html>")...)
-	default:
-		return errors.New("unsupported format")
-	}
-
-	err = os.WriteFile("links."+format, data, 0644)
+// ExtractLinksFromFile extracts all links from a given file.
+func ExtractLinksFromFile(filePath string) ([]string, error) {
+	content, err := os.ReadFile(filePath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	matches := LinkRegex.FindAllString(string(content), -1)
+	return matches, nil
+}
+
+// FilterLinksByRegex filters the provided links based on a regex pattern.
+func FilterLinksByRegex(links []string, pattern string) ([]string, error) {
+	var filteredLinks []string
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, link := range links {
+		if re.MatchString(link) {
+			filteredLinks = append(filteredLinks, link)
+		}
+	}
+
+	return filteredLinks, nil
+}
+
+// PrintLinksAsJSON prints the links in JSON format.
+func PrintLinksAsJSON(links []string) {
+	data, _ := json.Marshal(links)
+	fmt.Println(string(data))
+}
+
+// PrintLinksAsNumbered prints the links in a numbered list.
+func PrintLinksAsNumbered(links []string) {
+	for i, link := range links {
+		fmt.Printf("%d. %s\n", i+1, link)
+	}
+}
+
+// PrintLinksAsHTML prints the links in an HTML list format.
+func PrintLinksAsHTML(links []string) {
+	fmt.Println("<ul>")
+	for _, link := range links {
+		fmt.Printf("  <li><a href=\"%s\">%s</a></li>\n", link, link)
+	}
+	fmt.Println("</ul>")
+}
+
+// PrintLinksAsText prints the links as plain text.
+func PrintLinksAsText(links []string) {
+	for _, link := range links {
+		fmt.Println(link)
+	}
 }
