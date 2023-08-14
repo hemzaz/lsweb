@@ -3,9 +3,11 @@ package parser
 import (
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
+	"golang.org/x/net/html"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
 )
@@ -13,29 +15,59 @@ import (
 var LinkRegex = regexp.MustCompile(`http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+`)
 
 // ExtractLinksFromURL fetches the content of a URL and extracts all links from it.
-func ExtractLinksFromURL(url string, ignoreCert bool) ([]string, error) {
-	var links []string
-
-	// Create an HTTP client that ignores certificate errors if the flag is set.
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: ignoreCert},
+func ExtractLinksFromURL(targetURL string, ignoreCert bool) ([]string, error) {
+	// If ignoreCert is true, create a custom client that ignores SSL verification
+	var client *http.Client
+	if ignoreCert {
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		client = &http.Client{Transport: tr}
+	} else {
+		client = &http.Client{}
 	}
-	client := &http.Client{Transport: tr}
 
-	resp, err := client.Get(url)
+	resp, err := client.Get(targetURL)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New("failed to fetch the webpage")
+	}
+
+	doc, err := html.Parse(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	matches := LinkRegex.FindAllString(string(body), -1)
-	for _, match := range matches {
-		links = append(links, match)
+	var links []string
+	var malformedURLs []string
+	var f func(*html.Node)
+	f = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.Data == "a" {
+			for _, a := range n.Attr {
+				if a.Key == "href" {
+					// Convert relative URLs to absolute URLs
+					absoluteURL, err := url.Parse(a.Val)
+					if err != nil {
+						malformedURLs = append(malformedURLs, a.Val)
+						continue
+					}
+					absoluteURL = resp.Request.URL.ResolveReference(absoluteURL)
+					links = append(links, absoluteURL.String())
+				}
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			f(c)
+		}
+	}
+	f(doc)
+
+	if len(malformedURLs) > 0 {
+		return links, fmt.Errorf("malformed URLs detected: %v", malformedURLs)
 	}
 
 	return links, nil
