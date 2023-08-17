@@ -58,16 +58,10 @@ func main() {
 	}
 
 	// Download the files
-	err = downloader.DownloadFiles(links, *ignoreCertFlag)
-	if err != nil {
-		log.Fatal(err)
-	}
+	downloader.DownloadFiles(links, *ignoreCertFlag)
 
 	// Download the files simultaneously
-	err = downloader.DownloadFilesSimultaneously(links, *ignoreCertFlag)
-	if err != nil {
-		log.Fatal(err)
-	}
+	downloader.DownloadFilesSimultaneously(links)
 
 	switch strings.ToLower(*outputFlag) {
 	case "json":
