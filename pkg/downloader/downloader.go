@@ -1,117 +1,129 @@
 package downloader
 
 import (
-	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"strings"
-
-	"github.com/google/go-github/v39/github"
-	"golang.org/x/oauth2"
 )
 
 type GitHubRelease struct {
-	TagName string  `json:"tag_name"`
-	Assets  []Asset `json:"assets"`
+	URL     string `json:"url"`
+	HTMLURL string `json:"html_url"`
+	Assets  []struct {
+		URL                string `json:"url"`
+		Name               string `json:"name"`
+		BrowserDownloadURL string `json:"browser_download_url"`
+	} `json:"assets"`
 }
 
-type Asset struct {
-	Name               string `json:"name"`
-	BrowserDownloadURL string `json:"browser_download_url"`
-}
-
-// FetchGitHubReleases fetches the releases of a GitHub repository.
-// FetchGitHubReleases fetches the releases of a GitHub repository.
-func FetchGitHubReleases(repoURL string, ignoreCert bool) ([]GitHubRelease, error) {
-	parts := strings.Split(repoURL, "/")
-	if len(parts) < 2 {
-		return nil, fmt.Errorf("invalid GitHub repository URL")
-	}
-
-	owner := parts[len(parts)-2]
-	repo := parts[len(parts)-1]
-
-	// Create an HTTP client that ignores certificate errors if the flag is set.
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: ignoreCert},
-	}
-	httpClient := &http.Client{Transport: tr}
-
-	var client *github.Client
-	token := os.Getenv("GITHUB_TOKEN")
-	if token != "" {
-		ts := oauth2.StaticTokenSource(
-			&oauth2.Token{AccessToken: token},
-		)
-		tc := oauth2.NewClient(context.Background(), ts)
-		client = github.NewClient(tc)
-	} else {
-		client = github.NewClient(httpClient)
-	}
-
-	releases, _, err := client.Repositories.ListReleases(context.Background(), owner, repo, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var ghReleases []GitHubRelease
-	for _, release := range releases {
-		var assets []Asset
-		for _, asset := range release.Assets {
-			assets = append(assets, Asset{
-				Name:               asset.GetName(),
-				BrowserDownloadURL: asset.GetBrowserDownloadURL(),
-			})
+func DownloadFile(filepath string, url string, ignoreCert bool) error {
+	client := &http.Client{}
+	if ignoreCert {
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
-		ghReleases = append(ghReleases, GitHubRelease{
-			TagName: release.GetTagName(),
-			Assets:  assets,
-		})
+		client.Transport = tr
 	}
-
-	return ghReleases, nil
-}
-
-// DownloadFilesSimultaneously downloads files concurrently.
-func DownloadFilesSimultaneously(urls []string, ignoreCert bool) {
-	for _, url := range urls {
-		go DownloadFile(url, ignoreCert)
-	}
-}
-
-// DownloadFiles downloads files one by one.
-func DownloadFiles(urls []string, ignoreCert bool) {
-	for _, url := range urls {
-		DownloadFile(url, ignoreCert)
-	}
-}
-
-// DownloadFile downloads a file from a given URL.
-func DownloadFile(url string, ignoreCert bool) error {
-	// Create an HTTP client that ignores certificate errors if the flag is set.
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: ignoreCert},
-	}
-	client := &http.Client{Transport: tr}
 
 	resp, err := client.Get(url)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			fmt.Println(err)
+		}
+	}(resp.Body)
 
-	parts := strings.Split(url, "/")
-	filename := parts[len(parts)-1]
-
-	out, err := os.Create(filename)
+	out, err := os.Create(filepath)
 	if err != nil {
 		return err
 	}
-	defer out.Close()
+	defer func(out *os.File) {
+		err := out.Close()
+		if err != nil {
+			fmt.Println(err)
+		}
+	}(out)
 
 	_, err = io.Copy(out, resp.Body)
 	return err
+}
+
+func DownloadFiles(urls []string, ignoreCert bool) {
+	for _, url := range urls {
+		parts := strings.Split(url, "/")
+		filename := parts[len(parts)-1]
+		err := DownloadFile(filename, url, ignoreCert)
+		if err != nil {
+			fmt.Println("Error downloading file:", err)
+		}
+	}
+}
+
+func DownloadFilesSimultaneously(urls []string, ignoreCert bool) {
+	ch := make(chan string)
+	for _, url := range urls {
+		go func(url string) {
+			parts := strings.Split(url, "/")
+			filename := parts[len(parts)-1]
+			err := DownloadFile(filename, url, ignoreCert)
+			if err != nil {
+				ch <- fmt.Sprintf("Error downloading file %s: %s", filename, err)
+			} else {
+				ch <- fmt.Sprintf("Downloaded file %s", filename)
+			}
+		}(url)
+	}
+
+	for range urls {
+		fmt.Println(<-ch)
+	}
+}
+
+func FetchGitHubReleases(repoURL string, ignoreCert bool) ([]string, error) {
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/releases", repoURL)
+	req, err := http.NewRequest("GET", apiURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	client := &http.Client{}
+	if ignoreCert {
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		client.Transport = tr
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+
+		}
+	}(resp.Body)
+
+	var releases []GitHubRelease
+	err = json.NewDecoder(resp.Body).Decode(&releases)
+	if err != nil {
+		return nil, err
+	}
+
+	var urls []string
+	for _, release := range releases {
+		for _, asset := range release.Assets {
+			urls = append(urls, asset.BrowserDownloadURL)
+		}
+	}
+
+	return urls, nil
 }
