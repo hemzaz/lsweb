@@ -12,42 +12,38 @@ import (
 )
 
 func main() {
-	urlFlag := flag.String("u", "", "URL to extract links from")
-	fileFlag := flag.String("f", "", "File to extract links from")
-	ghFlag := flag.String("gh", "", "GitHub repository to fetch releases from")
-	downloadFlag := flag.Bool("d", false, "Download the files")
-	simFlag := flag.Bool("s", false, "Download the files simultaneously")
-	ignoreCertFlag := flag.Bool("ic", false, "Ignore certificate verification")
-	limitFlag := flag.Int("l", 0, "Limit the number of links to extract")
-	filterFlag := flag.String("filter", "", "Filter links using a regular expression")
-	outputFlag := flag.String("o", "txt", "Specify the output format: json, txt, num, html")
+	urlFlag := flag.String("u", "", "URL to fetch links from")
+	fileFlag := flag.String("f", "", "File to fetch links from")
+	outputFlag := flag.String("o", "txt", "Output format (json, txt, num, html)")
+	filterFlag := flag.String("filter", "", "Regex to filter links")
+	limitFlag := flag.Int("limit", 0, "Limit the number of links to fetch")
+	ignoreCertFlag := flag.Bool("ic", false, "Ignore certificate errors")
+	ghFlag := flag.Bool("gh", false, "Fetch GitHub releases")
 	flag.Parse()
 
 	var links []string
 	var err error
 
 	if *urlFlag != "" {
-		links, err = parser.ExtractLinksFromURL(*urlFlag, *ignoreCertFlag)
-		if err != nil {
-			log.Fatal(err)
+		if *ghFlag {
+			links, err = downloader.FetchGitHubReleases(*urlFlag, *ignoreCertFlag)
+			if err != nil {
+				log.Fatal(err)
+			}
+		} else {
+			links, err = parser.ExtractLinksFromURL(*urlFlag, *ignoreCertFlag)
+			if err != nil {
+				log.Fatal(err)
+			}
 		}
 	} else if *fileFlag != "" {
 		links, err = parser.ExtractLinksFromFile(*fileFlag)
 		if err != nil {
 			log.Fatal(err)
 		}
-	} else if *ghFlag != "" {
-		links, err = downloader.FetchGitHubReleases(*ghFlag, *ignoreCertFlag)
-		if err != nil {
-			log.Fatal(err)
-		}
 	} else {
-		fmt.Println("Please provide a URL, file, or GitHub repository to extract links from.")
+		fmt.Println("Please provide a URL or file to fetch links from")
 		os.Exit(1)
-	}
-
-	if *limitFlag > 0 && *limitFlag < len(links) {
-		links = links[:*limitFlag]
 	}
 
 	if *filterFlag != "" {
@@ -57,25 +53,33 @@ func main() {
 		}
 	}
 
+	if *limitFlag > 0 && *limitFlag < len(links) {
+		links = links[:*limitFlag]
+	}
+
+	// Download the files
+	err = downloader.DownloadFiles(links, *ignoreCertFlag)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Download the files simultaneously
+	err = downloader.DownloadFilesSimultaneously(links, *ignoreCertFlag)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	switch strings.ToLower(*outputFlag) {
 	case "json":
 		parser.PrintLinksAsJSON(links)
-	case "txt":
-		parser.PrintLinksAsText(links)
 	case "num":
 		parser.PrintLinksAsNumbered(links)
 	case "html":
 		parser.PrintLinksAsHTML(links)
+	case "txt":
+		parser.PrintLinksAsText(links)
 	default:
-		fmt.Println("Invalid output format. Available formats: json, txt, num, html.")
+		fmt.Println("Invalid output format")
 		os.Exit(1)
-	}
-
-	if *downloadFlag {
-		if *simFlag {
-			downloader.DownloadFilesSimultaneously(links, *ignoreCertFlag)
-		} else {
-			downloader.DownloadFiles(links, *ignoreCertFlag)
-		}
 	}
 }

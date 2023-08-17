@@ -3,24 +3,25 @@ package parser
 import (
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"regexp"
+	"strings"
+
+	"golang.org/x/net/html"
 )
 
-var LinkRegex = regexp.MustCompile(`http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*(),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+`)
-
-func ExtractLinksFromURL(url string, ignoreCert bool) ([]string, error) {
-	var links []string
-
+func ExtractLinksFromURL(targetURL string, ignoreCert bool) ([]string, error) {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: ignoreCert},
 	}
 	client := &http.Client{Transport: tr}
 
-	resp, err := client.Get(url)
+	resp, err := client.Get(targetURL)
 	if err != nil {
 		return nil, err
 	}
@@ -31,28 +32,73 @@ func ExtractLinksFromURL(url string, ignoreCert bool) ([]string, error) {
 		}
 	}(resp.Body)
 
-	body, err := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New("failed to fetch the webpage")
+	}
+
+	doc, err := html.Parse(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	matches := LinkRegex.FindAllString(string(body), -1)
-	for _, match := range matches {
-		links = append(links, match)
+	var links []string
+	var malformedURLs []string
+	var f func(*html.Node)
+	f = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.Data == "a" {
+			for _, a := range n.Attr {
+				if a.Key == "href" {
+					// Convert relative URLs to absolute URLs
+					absoluteURL, err := url.Parse(a.Val)
+					if err != nil {
+						malformedURLs = append(malformedURLs, a.Val)
+						continue
+					}
+					absoluteURL = resp.Request.URL.ResolveReference(absoluteURL)
+					links = append(links, absoluteURL.String())
+				}
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			f(c)
+		}
+	}
+	f(doc)
+
+	if len(malformedURLs) > 0 {
+		return links, fmt.Errorf("malformed URLs detected: %v", malformedURLs)
 	}
 
 	return links, nil
 }
 
-func FilterLinksByRegex(links []string, filter string) ([]string, error) {
+func ExtractLinksFromFile(filePath string) ([]string, error) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	var links []string
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			links = append(links, line)
+		}
+	}
+
+	return links, nil
+}
+
+func FilterLinksByRegex(links []string, regex string) ([]string, error) {
 	var filteredLinks []string
-	filterRegex, err := regexp.Compile(filter)
+	re, err := regexp.Compile(regex)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, link := range links {
-		if filterRegex.MatchString(link) {
+		if re.MatchString(link) {
 			filteredLinks = append(filteredLinks, link)
 		}
 	}
@@ -61,18 +107,12 @@ func FilterLinksByRegex(links []string, filter string) ([]string, error) {
 }
 
 func PrintLinksAsJSON(links []string) {
-	data, err := json.MarshalIndent(links, "", "  ")
+	data, err := json.Marshal(links)
 	if err != nil {
 		fmt.Println("Error:", err)
 		return
 	}
 	fmt.Println(string(data))
-}
-
-func PrintLinksAsText(links []string) {
-	for _, link := range links {
-		fmt.Println(link)
-	}
 }
 
 func PrintLinksAsNumbered(links []string) {
@@ -89,18 +129,14 @@ func PrintLinksAsHTML(links []string) {
 	fmt.Println("</ul>")
 }
 
-func ExtractLinksFromFile(filePath string) ([]string, error) {
-	var links []string
-
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, err
+func PrintLinksAsText(links []string) {
+	for _, link := range links {
+		fmt.Println(link)
 	}
-
-	matches := LinkRegex.FindAllString(string(data), -1)
-	for _, match := range matches {
-		links = append(links, match)
-	}
-
-	return links, nil
 }
+
+//func SaveLinksToFile(links []string, filePath string) error {
+//	data := strings.Join(links, "\n")
+//	err := os.WriteFile(filePath, []byte(data), 0644)
+//	return err
+//}

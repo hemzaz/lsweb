@@ -7,83 +7,15 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"strings"
+	"path/filepath"
+	"sync"
+
+	"github.com/schollz/progressbar/v3"
 )
 
 type GitHubRelease struct {
-	URL     string `json:"url"`
-	HTMLURL string `json:"html_url"`
-	Assets  []struct {
-		URL                string `json:"url"`
-		Name               string `json:"name"`
-		BrowserDownloadURL string `json:"browser_download_url"`
-	} `json:"assets"`
-}
-
-func DownloadFile(filepath string, url string, ignoreCert bool) error {
-	client := &http.Client{}
-	if ignoreCert {
-		tr := &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		}
-		client.Transport = tr
-	}
-
-	resp, err := client.Get(url)
-	if err != nil {
-		return err
-	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			fmt.Println(err)
-		}
-	}(resp.Body)
-
-	out, err := os.Create(filepath)
-	if err != nil {
-		return err
-	}
-	defer func(out *os.File) {
-		err := out.Close()
-		if err != nil {
-			fmt.Println(err)
-		}
-	}(out)
-
-	_, err = io.Copy(out, resp.Body)
-	return err
-}
-
-func DownloadFiles(urls []string, ignoreCert bool) {
-	for _, url := range urls {
-		parts := strings.Split(url, "/")
-		filename := parts[len(parts)-1]
-		err := DownloadFile(filename, url, ignoreCert)
-		if err != nil {
-			fmt.Println("Error downloading file:", err)
-		}
-	}
-}
-
-func DownloadFilesSimultaneously(urls []string, ignoreCert bool) {
-	ch := make(chan string)
-	for _, url := range urls {
-		go func(url string) {
-			parts := strings.Split(url, "/")
-			filename := parts[len(parts)-1]
-			err := DownloadFile(filename, url, ignoreCert)
-			if err != nil {
-				ch <- fmt.Sprintf("Error downloading file %s: %s", filename, err)
-			} else {
-				ch <- fmt.Sprintf("Downloaded file %s", filename)
-			}
-		}(url)
-	}
-
-	for range urls {
-		fmt.Println(<-ch)
-	}
+	URL  string `json:"html_url"`
+	Name string `json:"name"`
 }
 
 func FetchGitHubReleases(repoURL string, ignoreCert bool) ([]string, error) {
@@ -93,12 +25,15 @@ func FetchGitHubReleases(repoURL string, ignoreCert bool) ([]string, error) {
 		return nil, err
 	}
 
+	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
+		req.Header.Set("Authorization", "token "+token)
+	}
+
 	client := &http.Client{}
 	if ignoreCert {
-		tr := &http.Transport{
+		client.Transport = &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
-		client.Transport = tr
 	}
 
 	resp, err := client.Do(req)
@@ -108,7 +43,7 @@ func FetchGitHubReleases(repoURL string, ignoreCert bool) ([]string, error) {
 	defer func(Body io.ReadCloser) {
 		err := Body.Close()
 		if err != nil {
-
+			fmt.Println(err)
 		}
 	}(resp.Body)
 
@@ -118,12 +53,71 @@ func FetchGitHubReleases(repoURL string, ignoreCert bool) ([]string, error) {
 		return nil, err
 	}
 
-	var urls []string
+	var links []string
 	for _, release := range releases {
-		for _, asset := range release.Assets {
-			urls = append(urls, asset.BrowserDownloadURL)
-		}
+		links = append(links, release.URL)
 	}
 
-	return urls, nil
+	return links, nil
+}
+
+func DownloadFile(url string, showProgress bool) error {
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			fmt.Println(err)
+		}
+	}(resp.Body)
+
+	filename := filepath.Base(url)
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			fmt.Println(err)
+		}
+	}(file)
+
+	if showProgress {
+		bar := progressbar.DefaultBytes(
+			resp.ContentLength,
+			"downloading",
+		)
+		_, err = io.Copy(io.MultiWriter(file, bar), resp.Body)
+	} else {
+		_, err = io.Copy(file, resp.Body)
+	}
+
+	return err
+}
+
+func DownloadFiles(urls []string, showProgress bool) {
+	for _, url := range urls {
+		err := DownloadFile(url, showProgress)
+		if err != nil {
+			fmt.Println("Error downloading file:", err)
+		}
+	}
+}
+
+func DownloadFilesSimultaneously(urls []string) {
+	var wg sync.WaitGroup
+	for _, url := range urls {
+		wg.Add(1)
+		go func(url string) {
+			defer wg.Done()
+			err := DownloadFile(url, true)
+			if err != nil {
+				fmt.Println("Error downloading file:", err)
+			}
+		}(url)
+	}
+	wg.Wait()
 }
