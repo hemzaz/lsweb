@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/schollz/progressbar/v3"
@@ -19,24 +20,20 @@ type GitHubRelease struct {
 }
 
 func FetchGitHubReleases(repoURL string, ignoreCert bool) ([]string, error) {
-	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/releases", repoURL)
-	req, err := http.NewRequest("GET", apiURL, nil)
-	if err != nil {
-		return nil, err
+	parts := strings.Split(repoURL, "/")
+	if len(parts) < 5 {
+		return nil, fmt.Errorf("invalid GitHub URL")
 	}
+	user, repo := parts[3], parts[4]
 
-	if token := os.Getenv("GITHUB_TOKEN"); token != "" {
-		req.Header.Set("Authorization", "token "+token)
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases", user, repo)
+
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: ignoreCert},
 	}
+	client := &http.Client{Transport: tr}
 
-	client := &http.Client{}
-	if ignoreCert {
-		client.Transport = &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		}
-	}
-
-	resp, err := client.Do(req)
+	resp, err := client.Get(apiURL)
 	if err != nil {
 		return nil, err
 	}
@@ -47,18 +44,29 @@ func FetchGitHubReleases(repoURL string, ignoreCert bool) ([]string, error) {
 		}
 	}(resp.Body)
 
-	var releases []GitHubRelease
-	err = json.NewDecoder(resp.Body).Decode(&releases)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	var links []string
-	for _, release := range releases {
-		links = append(links, release.URL)
+	var releases []struct {
+		Assets []struct {
+			BrowserDownloadURL string `json:"browser_download_url"`
+		} `json:"assets"`
 	}
 
-	return links, nil
+	if err := json.Unmarshal(body, &releases); err != nil {
+		return nil, err
+	}
+
+	var downloadLinks []string
+	for _, release := range releases {
+		for _, asset := range release.Assets {
+			downloadLinks = append(downloadLinks, asset.BrowserDownloadURL)
+		}
+	}
+
+	return downloadLinks, nil
 }
 
 func DownloadFile(url string, ignoreCert bool, showProgress bool) error {
