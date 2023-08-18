@@ -1,4 +1,3 @@
-
 # lsweb
 
 `lsweb` is a command-line tool designed to list and download files from websites. It acts as an `ls` command for websites, providing a quick way to view and fetch downloadable content from a given URL.
@@ -44,48 +43,45 @@ lsweb [flags] <url>
 
 ### Flags
 
-- `-L, --list`: List downloadable links from the provided URL. This is also the default action if no flags are provided.
-- `-D, --download`: Download the files. By default, files are downloaded sequentially.
-- `-S, --sim`: Download files simultaneously.
-- `-O, --output`: Specify the output format. Available formats: `json`, `txt`, `num`, `html`. Default is `txt`.
-- `-F, --file`: Specify a file to write the output.
-- `--gh`: Accept a GitHub URL and list all release assets.
+- `-u`: URL to fetch links from
+- `-f`: File to fetch links from
+- `-o`: Output format (json, txt, num, html)
+- `-filter`: Regex to filter links
+- `-limit`: Limit the number of links to fetch
+- `-ic`: Ignore certificate errors
+- `-gh`: Fetch GitHub releases
+- `-download`: Download the files
+- `-list`: List the links (default: true)
+- `-sim`: Download files simultaneously
 
 ### Examples
 
 1. List downloadable links from a website:
    ```bash
-   lsweb -L --url https://example.com
+   lsweb -u https://example.com
    ```
 
 2. Download files from a website:
    ```bash
-   lsweb -D --url https://example.com
+   lsweb -download -u https://example.com
    ```
 
 3. Download files simultaneously:
    ```bash
-   lsweb -D -S --url https://example.com
+   lsweb -download -sim -u https://example.com
    ```
 
 4. List GitHub release assets:
    ```bash
-   lsweb --gh --url https://github.com/telegramdesktop/tdesktop/releases/tag/v4.8.10
+   lsweb -gh -u https://github.com/telegramdesktop/tdesktop/
    ```
 
-
-https://github.com/hemzaz/lsweb/assets/1830915/b2a071b8-56f9-42c9-b9cd-b2e83a1448b0
+https://github.com/hemzaz/lsweb/assets/1830915/e621f153-31b8-48e9-babd-ca174e1cd3ca
 
 
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a pull request or open an issue.
-
-## TODO  
-
-1. add --limit flag
-2. add --filter flag (use regex to filter files)
-3. add --ic flag (ignore certificate)
 
 ## License
 
