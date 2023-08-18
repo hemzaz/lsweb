@@ -61,8 +61,15 @@ func FetchGitHubReleases(repoURL string, ignoreCert bool) ([]string, error) {
 	return links, nil
 }
 
-func DownloadFile(url string, showProgress bool) error {
-	resp, err := http.Get(url)
+func DownloadFile(url string, ignoreCert bool, showProgress bool) error {
+	client := &http.Client{}
+	if ignoreCert {
+		client.Transport = &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+	}
+
+	resp, err := client.Get(url)
 	if err != nil {
 		return err
 	}
@@ -98,22 +105,22 @@ func DownloadFile(url string, showProgress bool) error {
 	return err
 }
 
-func DownloadFiles(urls []string, showProgress bool) {
+func DownloadFiles(urls []string, ignoreCert bool, showProgress bool) {
 	for _, url := range urls {
-		err := DownloadFile(url, showProgress)
+		err := DownloadFile(url, ignoreCert, showProgress)
 		if err != nil {
 			fmt.Println("Error downloading file:", err)
 		}
 	}
 }
 
-func DownloadFilesSimultaneously(urls []string) {
+func DownloadFilesSimultaneously(urls []string, ignoreCert bool) {
 	var wg sync.WaitGroup
 	for _, url := range urls {
 		wg.Add(1)
 		go func(url string) {
 			defer wg.Done()
-			err := DownloadFile(url, true)
+			err := DownloadFile(url, ignoreCert, true)
 			if err != nil {
 				fmt.Println("Error downloading file:", err)
 			}

@@ -19,6 +19,9 @@ func main() {
 	limitFlag := flag.Int("limit", 0, "Limit the number of links to fetch")
 	ignoreCertFlag := flag.Bool("ic", false, "Ignore certificate errors")
 	ghFlag := flag.Bool("gh", false, "Fetch GitHub releases")
+	downloadFlag := flag.Bool("download", false, "Download the files")
+	simFlag := flag.Bool("sim", false, "Download files simultaneously")
+	listFlag := flag.Bool("list", true, "List the links")
 	flag.Parse()
 
 	var links []string
@@ -57,23 +60,27 @@ func main() {
 		links = links[:*limitFlag]
 	}
 
-	// Download the files
-	downloader.DownloadFiles(links, *ignoreCertFlag)
+	if *downloadFlag {
+		if *simFlag {
+			downloader.DownloadFilesSimultaneously(links, *ignoreCertFlag)
+		} else {
+			downloader.DownloadFiles(links, *ignoreCertFlag, true)
+		}
+	}
 
-	// Download the files simultaneously
-	downloader.DownloadFilesSimultaneously(links)
-
-	switch strings.ToLower(*outputFlag) {
-	case "json":
-		parser.PrintLinksAsJSON(links)
-	case "num":
-		parser.PrintLinksAsNumbered(links)
-	case "html":
-		parser.PrintLinksAsHTML(links)
-	case "txt":
-		parser.PrintLinksAsText(links)
-	default:
-		fmt.Println("Invalid output format")
-		os.Exit(1)
+	if *listFlag {
+		switch strings.ToLower(*outputFlag) {
+		case "json":
+			parser.PrintLinksAsJSON(links)
+		case "num":
+			parser.PrintLinksAsNumbered(links)
+		case "html":
+			parser.PrintLinksAsHTML(links)
+		case "txt":
+			parser.PrintLinksAsText(links)
+		default:
+			fmt.Println("Invalid output format")
+			os.Exit(1)
+		}
 	}
 }
