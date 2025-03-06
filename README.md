@@ -15,7 +15,7 @@
 
 ### Prerequisites
 
-- Go (version 1.16 or higher)
+- Go (version 1.22 or higher)
 - `goreleaser` for building
 
 ### Building from Source
@@ -38,7 +38,7 @@
 ## Usage
 
 ```bash
-lsweb [flags] <url>
+lsweb [flags]
 ```
 
 ### Flags
@@ -53,6 +53,10 @@ lsweb [flags] <url>
 - `-download`: Download the files
 - `-list`: List the links (default: true)
 - `-sim`: Download files simultaneously
+- `-max-concurrent`: Maximum number of concurrent downloads (default: 5)
+- `-overwrite`: Overwrite existing files when downloading
+- `-timeout`: Timeout in seconds for HTTP requests (default: 60)
+- `-version`: Show version information
 
 ### Examples
 

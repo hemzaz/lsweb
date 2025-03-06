@@ -1,3 +1,4 @@
+// Package parser provides functions for extracting and filtering links from various sources.
 package parser
 
 import (
@@ -12,24 +13,29 @@ import (
 	"os"
 	"regexp"
 	"strings"
-	"time"
 
 	"golang.org/x/net/html"
+	
+	"github.com/hemzaz/lsweb/pkg/common"
 )
 
+// ExtractLinksFromURL fetches a URL and extracts all links from its content.
+// Supports HTML, JSON, XML content types.
+// The ignoreCert parameter can be used to skip TLS certificate validation.
+// Returns a slice of unique links found in the content or an error if the fetch or parsing fails.
 func ExtractLinksFromURL(targetURL string, ignoreCert bool) ([]string, error) {
 	// Set up a client with timeout
 	client := &http.Client{
-		Timeout: 30 * time.Second, // This should match the downloader package's timeout
+		Timeout: common.DefaultTimeout,
 	}
 	if ignoreCert {
 		client.Transport = &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
 	}
-
+	
 	// Create context for the request
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), common.DefaultTimeout)
 	defer cancel()
 	
 	// Create request with context
@@ -39,18 +45,17 @@ func ExtractLinksFromURL(targetURL string, ignoreCert bool) ([]string, error) {
 	}
 	
 	// Add a user-agent to be polite
-	req.Header.Set("User-Agent", "lsweb/1.0")
+	req.Header.Set("User-Agent", common.UserAgent)
 
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching webpage: %w", err)
 	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			fmt.Println(err)
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			fmt.Printf("Error closing response body: %v\n", closeErr)
 		}
-	}(resp.Body)
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("server returned non-success status: %d %s", resp.StatusCode, resp.Status)
@@ -59,14 +64,14 @@ func ExtractLinksFromURL(targetURL string, ignoreCert bool) ([]string, error) {
 	// Check content type - only process recognized types
 	contentType := resp.Header.Get("Content-Type")
 	if !strings.Contains(contentType, "text/html") && 
-	   !strings.Contains(contentType, "application/json") && 
-	   !strings.Contains(contentType, "application/xml") && 
-	   !strings.Contains(contentType, "text/xml") {
+		!strings.Contains(contentType, "application/json") && 
+		!strings.Contains(contentType, "application/xml") && 
+		!strings.Contains(contentType, "text/xml") {
 		return nil, fmt.Errorf("unsupported content type: %s", contentType)
 	}
 	
 	// Limit body size for safety
-	bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, 10*1024*1024)) // 10MB limit
+	bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, common.MaxContentSize))
 	if err != nil {
 		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
@@ -211,6 +216,10 @@ func removeDuplicateLinks(links []string) []string {
 	return result
 }
 
+// ExtractLinksFromFile reads a file and extracts all links from its content.
+// Supports HTML, JSON, and plain text files.
+// The file size is limited to 10MB for safety.
+// Returns a slice of unique links found in the file or an error if reading or parsing fails.
 func ExtractLinksFromFile(filePath string) ([]string, error) {
 	// Check file size before opening to prevent loading large files
 	fileInfo, err := os.Stat(filePath)
@@ -227,12 +236,11 @@ func ExtractLinksFromFile(filePath string) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error opening file: %w", err)
 	}
-	defer func(file *os.File) {
-		err := file.Close()
-		if err != nil {
-			fmt.Println(err)
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			fmt.Printf("Error closing file: %v\n", closeErr)
 		}
-	}(file)
+	}()
 
 	// Read the first few bytes to detect file type
 	header := make([]byte, 512)
@@ -302,6 +310,9 @@ func ExtractLinksFromFile(filePath string) ([]string, error) {
 	return links, nil
 }
 
+// FilterLinksByRegex filters a slice of links using a regular expression pattern.
+// Only links that match the pattern are returned.
+// Returns an error if the regex pattern is invalid.
 func FilterLinksByRegex(links []string, regex string) ([]string, error) {
 	re, err := regexp.Compile(regex)
 	if err != nil {
@@ -318,6 +329,8 @@ func FilterLinksByRegex(links []string, regex string) ([]string, error) {
 	return filteredLinks, nil
 }
 
+// PrintLinksAsJSON prints the links as a JSON array to stdout.
+// If JSON marshaling fails, an error message is printed.
 func PrintLinksAsJSON(links []string) {
 	data, err := json.Marshal(links)
 	if err != nil {
@@ -327,12 +340,16 @@ func PrintLinksAsJSON(links []string) {
 	fmt.Println(string(data))
 }
 
+// PrintLinksAsNumbered prints the links as a numbered list to stdout.
+// Each link is prefixed with its position number in the list.
 func PrintLinksAsNumbered(links []string) {
 	for i, link := range links {
 		fmt.Printf("%d. %s\n", i+1, link)
 	}
 }
 
+// PrintLinksAsHTML prints the links as an HTML unordered list to stdout.
+// Each link is wrapped in an anchor tag that links to itself.
 func PrintLinksAsHTML(links []string) {
 	fmt.Println("<ul>")
 	for _, link := range links {
@@ -341,6 +358,8 @@ func PrintLinksAsHTML(links []string) {
 	fmt.Println("</ul>")
 }
 
+// PrintLinksAsText prints the links as plain text to stdout.
+// Each link is printed on a new line.
 func PrintLinksAsText(links []string) {
 	for _, link := range links {
 		fmt.Println(link)

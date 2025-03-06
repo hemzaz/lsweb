@@ -1,6 +1,6 @@
 module github.com/hemzaz/lsweb
 
-go 1.20
+go 1.22
 
 require (
 	github.com/schollz/progressbar/v3 v3.13.1

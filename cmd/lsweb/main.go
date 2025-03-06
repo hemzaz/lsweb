@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hemzaz/lsweb/pkg/common"
 	"github.com/hemzaz/lsweb/pkg/downloader"
 	"github.com/hemzaz/lsweb/pkg/parser"
 )
@@ -32,7 +33,7 @@ func main() {
 
 	// Show version and exit if requested
 	if *versionFlag {
-		fmt.Println("lsweb version 1.0.0")
+		fmt.Printf("lsweb version %s\n", common.Version)
 		os.Exit(0)
 	}
 
@@ -45,9 +46,7 @@ func main() {
 
 	// Require either URL or file input
 	if *urlFlag == "" && *fileFlag == "" {
-		fmt.Println("Error: Please provide a URL (-u) or file (-f) to fetch links from")
-		flag.Usage()
-		os.Exit(1)
+		log.Fatal("Please provide a URL (-u) or file (-f) to fetch links from")
 	}
 
 	// Set the timeout value for HTTP requests
@@ -94,11 +93,17 @@ func main() {
 	// Download files if requested
 	if *downloadFlag {
 		if len(links) == 0 {
-			fmt.Println("No links to download")
+			log.Println("No links to download")
 		} else if *simFlag {
-			downloader.DownloadFilesSimultaneously(links, *ignoreCertFlag)
+			err = downloader.DownloadFilesSimultaneously(links, *ignoreCertFlag, true)
+			if err != nil {
+				log.Fatal(err)
+			}
 		} else {
-			downloader.DownloadFiles(links, *ignoreCertFlag, true)
+			err = downloader.DownloadFiles(links, *ignoreCertFlag, true)
+			if err != nil {
+				log.Fatal(err)
+			}
 		}
 	}
 
@@ -114,9 +119,7 @@ func main() {
 		case "txt":
 			parser.PrintLinksAsText(links)
 		default:
-			fmt.Printf("Invalid output format: %s\n", *outputFlag)
-			fmt.Println("Valid formats: json, txt, num, html")
-			os.Exit(1)
+			log.Fatalf("Invalid output format: %s (valid formats: json, txt, num, html)", *outputFlag)
 		}
 	}
 }
