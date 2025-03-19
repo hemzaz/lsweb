@@ -27,7 +27,7 @@ go.mod
 .idea/
 *.iml
 .vscode/
-
+dist
 # Binary directories and files
 bin/
 dist/

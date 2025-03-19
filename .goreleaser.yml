@@ -1,3 +1,4 @@
+version: 2
 project_name: lsweb
 builds:
 - id: lsweb
@@ -8,9 +9,8 @@ builds:
   - darwin
 archives:
 - id: lsweb
-  builds:
-  - lsweb
-  format: tar.gz
+  format_overrides:
+  - format: tar.gz
   files:
   - LICENSE
   - README.md

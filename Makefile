@@ -16,7 +16,7 @@ deps:
 # Build the project using goreleaser
 build: deps
 	@echo "Building $(BINARY_NAME) version $(VERSION) using goreleaser..."
-	goreleaser build --snapshot --rm-dist
+	goreleaser build --snapshot --clean
 
 # Format all Go files
 fmt:

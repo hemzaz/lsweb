@@ -1,0 +1,1028 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>lsweb: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/hemzaz/lsweb/cmd/lsweb/main.go (0.0%)</option>
+				
+				<option value="file1">github.com/hemzaz/lsweb/pkg/downloader/downloader.go (30.4%)</option>
+				
+				<option value="file2">github.com/hemzaz/lsweb/pkg/parser/parser.go (53.9%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package main
+
+import (
+        "flag"
+        "fmt"
+        "log"
+        "os"
+        "strings"
+        "time"
+
+        "github.com/hemzaz/lsweb/pkg/common"
+        "github.com/hemzaz/lsweb/pkg/downloader"
+        "github.com/hemzaz/lsweb/pkg/parser"
+)
+
+func main() <span class="cov0" title="0">{
+        // Setup flags
+        urlFlag := flag.String("u", "", "URL to fetch links from")
+        fileFlag := flag.String("f", "", "File to fetch links from")
+        outputFlag := flag.String("o", "txt", "Output format (json, txt, num, html)")
+        filterFlag := flag.String("filter", "", "Regex to filter links (can be specified multiple times)")
+        limitFlag := flag.Int("limit", 0, "Limit the number of links to fetch")
+        ignoreCertFlag := flag.Bool("ic", false, "Ignore certificate errors")
+        ghFlag := flag.Bool("gh", false, "Fetch GitHub releases")
+        downloadFlag := flag.Bool("download", false, "Download the files")
+        simFlag := flag.Bool("sim", false, "Download files simultaneously")
+        listFlag := flag.Bool("list", true, "List the links")
+        maxConcurrentFlag := flag.Int("max-concurrent", 5, "Maximum number of concurrent downloads (with -sim)")
+        overwriteFlag := flag.Bool("overwrite", false, "Overwrite existing files when downloading")
+        timeoutFlag := flag.Int("timeout", 60, "Timeout in seconds for HTTP requests")
+        versionFlag := flag.Bool("version", false, "Show version information")
+        flag.Parse()
+
+        // Show version and exit if requested
+        if *versionFlag </span><span class="cov0" title="0">{
+                fmt.Printf("lsweb version %s\n", common.Version)
+                os.Exit(0)
+        }</span>
+
+        // Configure logging
+        <span class="cov0" title="0">log.SetPrefix("lsweb: ")
+        log.SetFlags(0) // Don't show date/time in errors
+
+        var links []string
+        var err error
+
+        // Require either URL or file input
+        if *urlFlag == "" &amp;&amp; *fileFlag == "" </span><span class="cov0" title="0">{
+                log.Fatal("Please provide a URL (-u) or file (-f) to fetch links from")
+        }</span>
+
+        // Set the timeout value for HTTP requests
+        <span class="cov0" title="0">downloader.SetTimeout(time.Duration(*timeoutFlag) * time.Second)
+        downloader.SetMaxConcurrent(*maxConcurrentFlag)
+        downloader.SetOverwriteFiles(*overwriteFlag)
+
+        // Fetch links from source
+        if *urlFlag != "" </span><span class="cov0" title="0">{
+                if *ghFlag </span><span class="cov0" title="0">{
+                        links, err = downloader.FetchGitHubReleases(*urlFlag, *ignoreCertFlag)
+                        if err != nil </span><span class="cov0" title="0">{
+                                log.Fatal(err)
+                        }</span>
+                } else<span class="cov0" title="0"> {
+                        links, err = parser.ExtractLinksFromURL(*urlFlag, *ignoreCertFlag)
+                        if err != nil </span><span class="cov0" title="0">{
+                                log.Fatal(err)
+                        }</span>
+                }
+        } else<span class="cov0" title="0"> if *fileFlag != "" </span><span class="cov0" title="0">{
+                links, err = parser.ExtractLinksFromFile(*fileFlag)
+                if err != nil </span><span class="cov0" title="0">{
+                        log.Fatal(err)
+                }</span>
+        }
+
+        // Filter links if requested
+        <span class="cov0" title="0">if *filterFlag != "" </span><span class="cov0" title="0">{
+                links, err = parser.FilterLinksByRegex(links, *filterFlag)
+                if err != nil </span><span class="cov0" title="0">{
+                        log.Fatal(err)
+                }</span>
+        }
+
+        // Limit number of links if requested
+        <span class="cov0" title="0">if *limitFlag &gt; 0 &amp;&amp; *limitFlag &lt; len(links) </span><span class="cov0" title="0">{
+                links = links[:*limitFlag]
+        }</span>
+
+        // Show link count
+        <span class="cov0" title="0">fmt.Printf("Found %d links\n", len(links))
+
+        // Download files if requested
+        if *downloadFlag </span><span class="cov0" title="0">{
+                if len(links) == 0 </span><span class="cov0" title="0">{
+                        log.Println("No links to download")
+                }</span> else<span class="cov0" title="0"> if *simFlag </span><span class="cov0" title="0">{
+                        err = downloader.DownloadFilesSimultaneously(links, *ignoreCertFlag, true)
+                        if err != nil </span><span class="cov0" title="0">{
+                                log.Fatal(err)
+                        }</span>
+                } else<span class="cov0" title="0"> {
+                        err = downloader.DownloadFiles(links, *ignoreCertFlag, true)
+                        if err != nil </span><span class="cov0" title="0">{
+                                log.Fatal(err)
+                        }</span>
+                }
+        }
+
+        // List links if requested
+        <span class="cov0" title="0">if *listFlag &amp;&amp; len(links) &gt; 0 </span><span class="cov0" title="0">{
+                switch strings.ToLower(*outputFlag) </span>{
+                case "json":<span class="cov0" title="0">
+                        parser.PrintLinksAsJSON(links)</span>
+                case "num":<span class="cov0" title="0">
+                        parser.PrintLinksAsNumbered(links)</span>
+                case "html":<span class="cov0" title="0">
+                        parser.PrintLinksAsHTML(links)</span>
+                case "txt":<span class="cov0" title="0">
+                        parser.PrintLinksAsText(links)</span>
+                default:<span class="cov0" title="0">
+                        log.Fatalf("Invalid output format: %s (valid formats: json, txt, num, html)", *outputFlag)</span>
+                }
+        }
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">// Package downloader provides functions for downloading files from URLs
+// with support for progress tracking, batch downloads, and GitHub release assets.
+package downloader
+
+import (
+        "context"
+        "crypto/tls"
+        "encoding/json"
+        "fmt"
+        "io"
+        "net/http"
+        "net/url"
+        "os"
+        "path/filepath"
+        "strings"
+        "sync"
+        "time"
+
+        // Third-party dependencies
+        "github.com/schollz/progressbar/v3"
+
+        // Internal dependencies
+        "github.com/hemzaz/lsweb/pkg/common"
+)
+
+// Default configuration values
+var (
+        defaultTimeout         = common.DefaultTimeout
+        maxConcurrentDownloads = 5
+        allowOverwriteFiles    = false
+)
+
+// SetTimeout sets the timeout for HTTP requests
+func SetTimeout(timeout time.Duration) <span class="cov8" title="1">{
+        defaultTimeout = timeout
+}</span>
+
+// SetMaxConcurrent sets the maximum number of concurrent downloads
+func SetMaxConcurrent(max int) <span class="cov8" title="1">{
+        if max &gt; 0 </span><span class="cov8" title="1">{
+                maxConcurrentDownloads = max
+        }</span>
+}
+
+// SetOverwriteFiles sets whether to overwrite existing files
+func SetOverwriteFiles(overwrite bool) <span class="cov8" title="1">{
+        allowOverwriteFiles = overwrite
+}</span>
+
+type GitHubRelease struct {
+        URL  string `json:"html_url"`
+        Name string `json:"name"`
+}
+
+// FetchGitHubReleases retrieves download URLs for assets from all releases in a GitHub repository.
+// It parses the repository URL to extract owner and repo name, then queries the GitHub API.
+// Returns a slice of all asset download URLs or an error if the fetch fails.
+// The ignoreCert parameter can be used to skip TLS certificate validation.
+func FetchGitHubReleases(repoURL string, ignoreCert bool) ([]string, error) <span class="cov8" title="1">{
+        // Parse the URL properly
+        parsedURL, err := url.Parse(repoURL)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("invalid URL: %w", err)
+        }</span>
+
+        // Extract path components
+        <span class="cov8" title="1">pathParts := strings.Split(strings.TrimPrefix(parsedURL.Path, "/"), "/")
+        if len(pathParts) &lt; 2 </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("invalid GitHub repository URL: expected format github.com/{user}/{repo}")
+        }</span>
+
+        <span class="cov8" title="1">user, repo := pathParts[0], pathParts[1]
+        // Remove any trailing .git from repo name
+        repo = strings.TrimSuffix(repo, ".git")
+
+        apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases", user, repo)
+
+        // Set up the client with timeout
+        tr := &amp;http.Transport{
+                TLSClientConfig: &amp;tls.Config{InsecureSkipVerify: ignoreCert},
+        }
+        client := &amp;http.Client{
+                Transport: tr,
+                Timeout:   defaultTimeout,
+        }
+
+        // Create request with context
+        ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+        defer cancel()
+
+        req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("error creating request: %w", err)
+        }</span>
+
+        // Add user-agent and accept headers required by GitHub API
+        <span class="cov8" title="1">req.Header.Set("User-Agent", common.UserAgent)
+        req.Header.Set("Accept", "application/vnd.github.v3+json")
+
+        resp, err := client.Do(req)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("error fetching GitHub releases: %w", err)
+        }</span>
+        <span class="cov8" title="1">defer resp.Body.Close()
+
+        // Check for rate limiting
+        if resp.StatusCode == 403 &amp;&amp; resp.Header.Get("X-RateLimit-Remaining") == "0" </span><span class="cov0" title="0">{
+                resetTime := resp.Header.Get("X-RateLimit-Reset")
+                return nil, fmt.Errorf("GitHub API rate limit exceeded. Reset at %s", resetTime)
+        }</span>
+
+        // Check for other error status codes
+        <span class="cov8" title="1">if resp.StatusCode != http.StatusOK </span><span class="cov8" title="1">{
+                return nil, fmt.Errorf("GitHub API returned non-success status: %d %s", resp.StatusCode, resp.Status)
+        }</span>
+
+        // Limit body size for safety
+        <span class="cov0" title="0">body, err := io.ReadAll(io.LimitReader(resp.Body, common.MaxContentSize))
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("error reading response body: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">var releases []struct {
+                Assets []struct {
+                        BrowserDownloadURL string `json:"browser_download_url"`
+                        Name               string `json:"name"`
+                        Size               int    `json:"size"`
+                } `json:"assets"`
+                TagName string `json:"tag_name"`
+        }
+
+        if err := json.Unmarshal(body, &amp;releases); err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("error parsing GitHub response: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">var downloadLinks []string
+        for _, release := range releases </span><span class="cov0" title="0">{
+                for _, asset := range release.Assets </span><span class="cov0" title="0">{
+                        downloadLinks = append(downloadLinks, asset.BrowserDownloadURL)
+                }</span>
+        }
+
+        <span class="cov0" title="0">if len(downloadLinks) == 0 </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("no release assets found for %s/%s", user, repo)
+        }</span>
+
+        <span class="cov0" title="0">return downloadLinks, nil</span>
+}
+
+// DownloadFile downloads a single file from the specified URL to the current directory.
+// The file is named based on the last part of the URL path.
+// If showProgress is true, it displays a progress bar during download.
+// The ignoreCert parameter can be used to skip TLS certificate validation.
+// Returns an error if download fails, file already exists, or file is too large.
+func DownloadFile(url string, ignoreCert bool, showProgress bool) error <span class="cov8" title="1">{
+        // Create a context with timeout
+        ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+        defer cancel()
+
+        // Create a client with timeout
+        client := &amp;http.Client{
+                Timeout: defaultTimeout,
+        }
+        if ignoreCert </span><span class="cov0" title="0">{
+                client.Transport = &amp;http.Transport{
+                        TLSClientConfig: &amp;tls.Config{InsecureSkipVerify: true},
+                }
+        }</span>
+
+        // Create a request with context
+        <span class="cov8" title="1">req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("error creating request: %w", err)
+        }</span>
+
+        // Add a user-agent to be polite
+        <span class="cov8" title="1">req.Header.Set("User-Agent", common.UserAgent)
+
+        resp, err := client.Do(req)
+        if err != nil </span><span class="cov8" title="1">{
+                return fmt.Errorf("error downloading %s: %w", url, err)
+        }</span>
+        <span class="cov8" title="1">defer func() </span><span class="cov8" title="1">{
+                if closeErr := resp.Body.Close(); closeErr != nil </span><span class="cov0" title="0">{
+                        fmt.Printf("Error closing response body: %v\n", closeErr)
+                }</span>
+        }()
+
+        // Check for successful status code
+        <span class="cov8" title="1">if resp.StatusCode &lt; 200 || resp.StatusCode &gt;= 300 </span><span class="cov0" title="0">{
+                return fmt.Errorf("server returned non-success status: %d %s", resp.StatusCode, resp.Status)
+        }</span>
+
+        // Check content size if available
+        <span class="cov8" title="1">if resp.ContentLength &gt; 1024*1024*1000 </span><span class="cov0" title="0">{ // 1GB
+                return fmt.Errorf("file too large (%.2f GB). Use a dedicated download tool instead", float64(resp.ContentLength)/(1024*1024*1024))
+        }</span>
+
+        <span class="cov8" title="1">filename := filepath.Base(url)
+
+        // Check if file already exists
+        if !allowOverwriteFiles </span><span class="cov8" title="1">{
+                if _, err := os.Stat(filename); err == nil </span><span class="cov8" title="1">{
+                        return fmt.Errorf("file %s already exists, skipping download (use -overwrite to override)", filename)
+                }</span>
+        }
+
+        // Create the file
+        <span class="cov8" title="1">file, err := os.Create(filename)
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("error creating file %s: %w", filename, err)
+        }</span>
+        <span class="cov8" title="1">defer func() </span><span class="cov8" title="1">{
+                if closeErr := file.Close(); closeErr != nil </span><span class="cov0" title="0">{
+                        fmt.Printf("Error closing file: %v\n", closeErr)
+                }</span>
+        }()
+
+        <span class="cov8" title="1">if showProgress </span><span class="cov0" title="0">{
+                bar := progressbar.DefaultBytes(
+                        resp.ContentLength,
+                        "downloading "+filename,
+                )
+                _, err = io.Copy(io.MultiWriter(file, bar), resp.Body)
+        }</span> else<span class="cov8" title="1"> {
+                _, err = io.Copy(file, resp.Body)
+        }</span>
+
+        <span class="cov8" title="1">if err != nil </span><span class="cov0" title="0">{
+                // On error, clean up the partial file
+                os.Remove(filename)
+                return fmt.Errorf("error writing to file: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">return nil</span>
+}
+
+// DownloadFiles downloads multiple files sequentially from the provided URLs.
+// If showProgress is true, it displays a progress bar for each download.
+// The ignoreCert parameter can be used to skip TLS certificate validation.
+// The function continues to the next URL if a download fails and returns an error
+// at the end if any downloads failed.
+func DownloadFiles(urls []string, ignoreCert bool, showProgress bool) error <span class="cov0" title="0">{
+        if len(urls) == 0 </span><span class="cov0" title="0">{
+                return fmt.Errorf("no URLs to download")
+        }</span>
+
+        // Create a context with timeout for the entire operation
+        <span class="cov0" title="0">ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+        defer cancel()
+
+        var failedCount int
+
+        for i, url := range urls </span><span class="cov0" title="0">{
+                // Check for context cancellation between downloads
+                select </span>{
+                case &lt;-ctx.Done():<span class="cov0" title="0">
+                        return fmt.Errorf("download operation timed out after %d/%d files", i, len(urls))</span>
+                default:<span class="cov0" title="0"></span>
+                        // Continue with download
+                }
+
+                <span class="cov0" title="0">fmt.Printf("[%d/%d] Downloading: %s\n", i+1, len(urls), url)
+                err := DownloadFile(url, ignoreCert, showProgress)
+                if err != nil </span><span class="cov0" title="0">{
+                        fmt.Printf("Error downloading %s: %v\n", url, err)
+                        failedCount++
+                        // Continue with next URL rather than stopping
+                }</span> else<span class="cov0" title="0"> if showProgress </span><span class="cov0" title="0">{
+                        // Add a newline after progress bar completes
+                        fmt.Println()
+                }</span>
+
+                // Add a small delay between downloads to be kind to servers
+                <span class="cov0" title="0">if i &lt; len(urls)-1 </span><span class="cov0" title="0">{
+                        time.Sleep(500 * time.Millisecond)
+                }</span>
+        }
+
+        <span class="cov0" title="0">fmt.Printf("Download complete: %d/%d files\n", len(urls)-failedCount, len(urls))
+
+        if failedCount &gt; 0 </span><span class="cov0" title="0">{
+                return fmt.Errorf("%d/%d downloads failed", failedCount, len(urls))
+        }</span>
+
+        <span class="cov0" title="0">return nil</span>
+}
+
+// DownloadFilesSimultaneously downloads multiple files concurrently from the provided URLs.
+// It uses a semaphore to limit the number of concurrent downloads to maxConcurrentDownloads.
+// The ignoreCert parameter can be used to skip TLS certificate validation.
+// The showProgress parameter determines whether to display progress bars (defaults to true).
+// Returns an error if any download fails, including the count of failed downloads.
+func DownloadFilesSimultaneously(urls []string, ignoreCert bool, showProgress bool) error <span class="cov0" title="0">{
+        if len(urls) == 0 </span><span class="cov0" title="0">{
+                return fmt.Errorf("no URLs to download")
+        }</span>
+
+        // Create a semaphore to limit concurrency
+        <span class="cov0" title="0">maxConcurrent := maxConcurrentDownloads
+        sem := make(chan struct{}, maxConcurrent)
+
+        // Use a mutex to protect file creation
+        var mu sync.Mutex
+
+        // Track errors
+        errorChan := make(chan error, len(urls))
+
+        var wg sync.WaitGroup
+        for _, url := range urls </span><span class="cov0" title="0">{
+                wg.Add(1)
+                go func(url string) </span><span class="cov0" title="0">{
+                        // Acquire semaphore
+                        sem &lt;- struct{}{}
+                        defer func() </span><span class="cov0" title="0">{
+                                // Release semaphore when done
+                                &lt;-sem
+                                wg.Done()
+                        }</span>()
+
+                        // Use a more atomic file creation approach
+                        <span class="cov0" title="0">mu.Lock()
+                        filename := filepath.Base(url)
+
+                        // Check if file already exists
+                        if !allowOverwriteFiles </span><span class="cov0" title="0">{
+                                if _, err := os.Stat(filename); err == nil </span><span class="cov0" title="0">{
+                                        // File exists, create a unique name
+                                        for i := 1; ; i++ </span><span class="cov0" title="0">{
+                                                newName := fmt.Sprintf("%s.%d", filename, i)
+                                                if _, err := os.Stat(newName); os.IsNotExist(err) </span><span class="cov0" title="0">{
+                                                        filename = newName
+                                                        break</span>
+                                                }
+                                        }
+                                }
+                        }
+                        <span class="cov0" title="0">mu.Unlock()
+
+                        // Custom download to use our unique filename
+                        client := &amp;http.Client{
+                                Timeout: defaultTimeout,
+                        }
+                        if ignoreCert </span><span class="cov0" title="0">{
+                                client.Transport = &amp;http.Transport{
+                                        TLSClientConfig: &amp;tls.Config{InsecureSkipVerify: true},
+                                }
+                        }</span>
+
+                        // Create a request with context
+                        <span class="cov0" title="0">ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+                        defer cancel()
+                        req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+                        if err != nil </span><span class="cov0" title="0">{
+                                errorChan &lt;- fmt.Errorf("error creating request for %s: %w", url, err)
+                                return
+                        }</span>
+
+                        // Add a user-agent to be polite
+                        <span class="cov0" title="0">req.Header.Set("User-Agent", common.UserAgent)
+
+                        resp, err := client.Do(req)
+                        if err != nil </span><span class="cov0" title="0">{
+                                errorChan &lt;- fmt.Errorf("error downloading %s: %w", url, err)
+                                return
+                        }</span>
+                        <span class="cov0" title="0">defer func() </span><span class="cov0" title="0">{
+                                if closeErr := resp.Body.Close(); closeErr != nil </span><span class="cov0" title="0">{
+                                        fmt.Printf("Error closing response body: %v\n", closeErr)
+                                }</span>
+                        }()
+
+                        // Check for successful status code
+                        <span class="cov0" title="0">if resp.StatusCode &lt; 200 || resp.StatusCode &gt;= 300 </span><span class="cov0" title="0">{
+                                errorChan &lt;- fmt.Errorf("server returned non-success status for %s: %d %s", url, resp.StatusCode, resp.Status)
+                                return
+                        }</span>
+
+                        <span class="cov0" title="0">file, err := os.Create(filename)
+                        if err != nil </span><span class="cov0" title="0">{
+                                errorChan &lt;- fmt.Errorf("error creating file %s: %w", filename, err)
+                                return
+                        }</span>
+                        <span class="cov0" title="0">defer func() </span><span class="cov0" title="0">{
+                                if closeErr := file.Close(); closeErr != nil </span><span class="cov0" title="0">{
+                                        fmt.Printf("Error closing file: %v\n", closeErr)
+                                }</span>
+                        }()
+
+                        <span class="cov0" title="0">if showProgress </span><span class="cov0" title="0">{
+                                bar := progressbar.DefaultBytes(
+                                        resp.ContentLength,
+                                        "downloading "+filename,
+                                )
+                                _, err = io.Copy(io.MultiWriter(file, bar), resp.Body)
+                        }</span> else<span class="cov0" title="0"> {
+                                _, err = io.Copy(file, resp.Body)
+                        }</span>
+                        <span class="cov0" title="0">if err != nil </span><span class="cov0" title="0">{
+                                // Clean up partial file
+                                os.Remove(filename)
+                                errorChan &lt;- fmt.Errorf("error writing to file %s: %w", filename, err)
+                        }</span>
+                }(url)
+        }
+
+        // Wait for all downloads to complete
+        <span class="cov0" title="0">wg.Wait()
+        close(errorChan)
+
+        // Collect errors
+        var downloadErrors []string
+        for err := range errorChan </span><span class="cov0" title="0">{
+                downloadErrors = append(downloadErrors, err.Error())
+        }</span>
+
+        <span class="cov0" title="0">if len(downloadErrors) &gt; 0 </span><span class="cov0" title="0">{
+                // Return a concatenated error with all details
+                return fmt.Errorf("%d download(s) failed. Errors: %s",
+                        len(downloadErrors),
+                        strings.Join(downloadErrors, "; "))
+        }</span>
+
+        <span class="cov0" title="0">return nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">// Package parser provides functions for extracting and filtering links from various sources.
+package parser
+
+import (
+        "bytes"
+        "context"
+        "crypto/tls"
+        "encoding/json"
+        "fmt"
+        "io"
+        "net/http"
+        "net/url"
+        "os"
+        "regexp"
+        "strings"
+
+        "golang.org/x/net/html"
+
+        "github.com/hemzaz/lsweb/pkg/common"
+)
+
+// ExtractLinksFromURL fetches a URL and extracts all links from its content.
+// Supports HTML, JSON, XML content types.
+// The ignoreCert parameter can be used to skip TLS certificate validation.
+// Returns a slice of unique links found in the content or an error if the fetch or parsing fails.
+func ExtractLinksFromURL(targetURL string, ignoreCert bool) ([]string, error) <span class="cov0" title="0">{
+        // Set up a client with timeout
+        client := &amp;http.Client{
+                Timeout: common.DefaultTimeout,
+        }
+        if ignoreCert </span><span class="cov0" title="0">{
+                client.Transport = &amp;http.Transport{
+                        TLSClientConfig: &amp;tls.Config{InsecureSkipVerify: true},
+                }
+        }</span>
+
+        // Create context for the request
+        <span class="cov0" title="0">ctx, cancel := context.WithTimeout(context.Background(), common.DefaultTimeout)
+        defer cancel()
+
+        // Create request with context
+        req, err := http.NewRequestWithContext(ctx, "GET", targetURL, nil)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("error creating request: %w", err)
+        }</span>
+
+        // Add a user-agent to be polite
+        <span class="cov0" title="0">req.Header.Set("User-Agent", common.UserAgent)
+
+        resp, err := client.Do(req)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("error fetching webpage: %w", err)
+        }</span>
+        <span class="cov0" title="0">defer func() </span><span class="cov0" title="0">{
+                if closeErr := resp.Body.Close(); closeErr != nil </span><span class="cov0" title="0">{
+                        fmt.Printf("Error closing response body: %v\n", closeErr)
+                }</span>
+        }()
+
+        <span class="cov0" title="0">if resp.StatusCode != http.StatusOK </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("server returned non-success status: %d %s", resp.StatusCode, resp.Status)
+        }</span>
+
+        // Check content type - only process recognized types
+        <span class="cov0" title="0">contentType := resp.Header.Get("Content-Type")
+        if !strings.Contains(contentType, "text/html") &amp;&amp;
+                !strings.Contains(contentType, "application/json") &amp;&amp;
+                !strings.Contains(contentType, "application/xml") &amp;&amp;
+                !strings.Contains(contentType, "text/xml") </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("unsupported content type: %s", contentType)
+        }</span>
+
+        // Limit body size for safety
+        <span class="cov0" title="0">bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, common.MaxContentSize))
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("error reading response body: %w", err)
+        }</span>
+
+        // Different handling based on content type
+        <span class="cov0" title="0">var links []string
+
+        if strings.Contains(contentType, "application/json") </span><span class="cov0" title="0">{
+                // For JSON content, try to extract URLs from JSON structure
+                var jsonData interface{}
+                if err := json.Unmarshal(bodyBytes, &amp;jsonData); err != nil </span><span class="cov0" title="0">{
+                        return nil, fmt.Errorf("error parsing JSON: %w", err)
+                }</span>
+                <span class="cov0" title="0">links = extractLinksFromJSON(jsonData)</span>
+        } else<span class="cov0" title="0"> {
+                // Create a new reader from the bytes
+                bodyReader := bytes.NewReader(bodyBytes)
+
+                // Parse HTML for links
+                doc, err := html.Parse(bodyReader)
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, fmt.Errorf("error parsing HTML: %w", err)
+                }</span>
+
+                // Extract links from HTML
+                <span class="cov0" title="0">var malformedURLs []string
+                links, malformedURLs = extractLinksFromHTML(doc, resp.Request.URL)
+
+                if len(malformedURLs) &gt; 0 </span><span class="cov0" title="0">{
+                        // Continue with the links we found, but warn about malformed ones
+                        fmt.Printf("Warning: %d malformed URLs detected\n", len(malformedURLs))
+                }</span>
+        }
+
+        // Remove duplicates
+        <span class="cov0" title="0">links = removeDuplicateLinks(links)
+
+        return links, nil</span>
+}
+
+// Helper function to extract links from HTML
+func extractLinksFromHTML(doc *html.Node, baseURL *url.URL) ([]string, []string) <span class="cov8" title="1">{
+        var links []string
+        var malformedURLs []string
+
+        // Use a map to track visited URLs for deduplication
+        visited := make(map[string]bool)
+
+        // Use a function to traverse the DOM
+        var traverse func(*html.Node)
+        traverse = func(n *html.Node) </span><span class="cov8" title="1">{
+                if n.Type == html.ElementNode &amp;&amp; n.Data == "a" </span><span class="cov8" title="1">{
+                        for _, a := range n.Attr </span><span class="cov8" title="1">{
+                                if a.Key == "href" </span><span class="cov8" title="1">{
+                                        // Convert relative URLs to absolute URLs
+                                        absoluteURL, err := url.Parse(a.Val)
+                                        if err != nil </span><span class="cov0" title="0">{
+                                                malformedURLs = append(malformedURLs, a.Val)
+                                                continue</span>
+                                        }
+
+                                        <span class="cov8" title="1">absoluteURL = baseURL.ResolveReference(absoluteURL)
+                                        urlStr := absoluteURL.String()
+
+                                        // Skip javascript: and mailto: links
+                                        if strings.HasPrefix(urlStr, "javascript:") ||
+                                                strings.HasPrefix(urlStr, "mailto:") ||
+                                                strings.HasPrefix(urlStr, "#") </span><span class="cov8" title="1">{
+                                                continue</span>
+                                        }
+
+                                        // Add to links if not already visited
+                                        <span class="cov8" title="1">if !visited[urlStr] </span><span class="cov8" title="1">{
+                                                visited[urlStr] = true
+                                                links = append(links, urlStr)
+                                        }</span>
+                                }
+                        }
+                }
+
+                // Traverse children
+                <span class="cov8" title="1">for c := n.FirstChild; c != nil; c = c.NextSibling </span><span class="cov8" title="1">{
+                        traverse(c)
+                }</span>
+        }
+
+        <span class="cov8" title="1">traverse(doc)
+        return links, malformedURLs</span>
+}
+
+// Helper function to extract links from JSON
+func extractLinksFromJSON(data interface{}) []string <span class="cov8" title="1">{
+        var links []string
+        var extract func(interface{})
+
+        // Use a map to track visited URLs for deduplication
+        visited := make(map[string]bool)
+
+        // Define URL regex pattern
+        urlPattern := regexp.MustCompile(`https?://[^\s"']+`)
+
+        extract = func(v interface{}) </span><span class="cov8" title="1">{
+                switch val := v.(type) </span>{
+                case map[string]interface{}:<span class="cov8" title="1">
+                        for _, value := range val </span><span class="cov8" title="1">{
+                                extract(value)
+                        }</span>
+                case []interface{}:<span class="cov8" title="1">
+                        for _, item := range val </span><span class="cov8" title="1">{
+                                extract(item)
+                        }</span>
+                case string:<span class="cov8" title="1">
+                        // Check if string is a URL
+                        if urlPattern.MatchString(val) </span><span class="cov8" title="1">{
+                                matches := urlPattern.FindAllString(val, -1)
+                                for _, match := range matches </span><span class="cov8" title="1">{
+                                        if !visited[match] </span><span class="cov8" title="1">{
+                                                visited[match] = true
+                                                links = append(links, match)
+                                        }</span>
+                                }
+                        }
+                }
+        }
+
+        <span class="cov8" title="1">extract(data)
+        return links</span>
+}
+
+// Helper function to remove duplicate links
+func removeDuplicateLinks(links []string) []string <span class="cov8" title="1">{
+        seen := make(map[string]bool)
+        result := []string{}
+
+        for _, link := range links </span><span class="cov8" title="1">{
+                if !seen[link] </span><span class="cov8" title="1">{
+                        seen[link] = true
+                        result = append(result, link)
+                }</span>
+        }
+
+        <span class="cov8" title="1">return result</span>
+}
+
+// ExtractLinksFromFile reads a file and extracts all links from its content.
+// Supports HTML, JSON, and plain text files.
+// The file size is limited to 10MB for safety.
+// Returns a slice of unique links found in the file or an error if reading or parsing fails.
+func ExtractLinksFromFile(filePath string) ([]string, error) <span class="cov8" title="1">{
+        // Check file size before opening to prevent loading large files
+        fileInfo, err := os.Stat(filePath)
+        if err != nil </span><span class="cov8" title="1">{
+                return nil, fmt.Errorf("error checking file: %w", err)
+        }</span>
+
+        // Limit file size to 10MB
+        <span class="cov8" title="1">if fileInfo.Size() &gt; 10*1024*1024 </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("file too large (%.2f MB). Maximum size is 10MB", float64(fileInfo.Size())/(1024*1024))
+        }</span>
+
+        <span class="cov8" title="1">file, err := os.Open(filePath)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("error opening file: %w", err)
+        }</span>
+        <span class="cov8" title="1">defer func() </span><span class="cov8" title="1">{
+                if closeErr := file.Close(); closeErr != nil </span><span class="cov0" title="0">{
+                        fmt.Printf("Error closing file: %v\n", closeErr)
+                }</span>
+        }()
+
+        // Read the first few bytes to detect file type
+        <span class="cov8" title="1">header := make([]byte, 512)
+        _, err = file.Read(header)
+        if err != nil &amp;&amp; err != io.EOF </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("error reading file header: %w", err)
+        }</span>
+
+        // Reset file position
+        <span class="cov8" title="1">_, err = file.Seek(0, 0)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("error resetting file position: %w", err)
+        }</span>
+
+        // Detect content type
+        <span class="cov8" title="1">contentType := http.DetectContentType(header)
+
+        // Read the entire file
+        content, err := io.ReadAll(file)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("error reading file content: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">var links []string
+
+        // Process based on content type
+        if strings.Contains(contentType, "text/html") </span><span class="cov8" title="1">{
+                // Parse HTML
+                doc, err := html.Parse(bytes.NewReader(content))
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, fmt.Errorf("error parsing HTML: %w", err)
+                }</span>
+
+                // Create a base URL for resolving relative links
+                <span class="cov8" title="1">baseURL, _ := url.Parse("file://" + filePath)
+
+                // Extract links
+                links, _ = extractLinksFromHTML(doc, baseURL)</span>
+
+        } else<span class="cov0" title="0"> if strings.Contains(contentType, "application/json") </span><span class="cov0" title="0">{
+                // Parse JSON
+                var jsonData interface{}
+                if err := json.Unmarshal(content, &amp;jsonData); err != nil </span><span class="cov0" title="0">{
+                        return nil, fmt.Errorf("error parsing JSON: %w", err)
+                }</span>
+
+                // Extract links from JSON
+                <span class="cov0" title="0">links = extractLinksFromJSON(jsonData)</span>
+
+        } else<span class="cov0" title="0"> if strings.Contains(contentType, "text/plain") </span><span class="cov0" title="0">{
+                // For plain text, look for URLs using regex
+                urlPattern := regexp.MustCompile(`https?://[^\s"']+`)
+                matches := urlPattern.FindAllString(string(content), -1)
+
+                // Remove duplicates
+                seen := make(map[string]bool)
+                for _, match := range matches </span><span class="cov0" title="0">{
+                        if !seen[match] </span><span class="cov0" title="0">{
+                                seen[match] = true
+                                links = append(links, match)
+                        }</span>
+                }
+        } else<span class="cov0" title="0"> {
+                return nil, fmt.Errorf("unsupported file type: %s", contentType)
+        }</span>
+
+        <span class="cov8" title="1">return links, nil</span>
+}
+
+// FilterLinksByRegex filters a slice of links using a regular expression pattern.
+// Only links that match the pattern are returned.
+// Returns an error if the regex pattern is invalid.
+func FilterLinksByRegex(links []string, regex string) ([]string, error) <span class="cov8" title="1">{
+        re, err := regexp.Compile(regex)
+        if err != nil </span><span class="cov8" title="1">{
+                return nil, err
+        }</span>
+
+        <span class="cov8" title="1">var filteredLinks []string
+        for _, link := range links </span><span class="cov8" title="1">{
+                if re.MatchString(link) </span><span class="cov8" title="1">{
+                        filteredLinks = append(filteredLinks, link)
+                }</span>
+        }
+
+        <span class="cov8" title="1">return filteredLinks, nil</span>
+}
+
+// PrintLinksAsJSON prints the links as a JSON array to stdout.
+// If JSON marshaling fails, an error message is printed.
+func PrintLinksAsJSON(links []string) <span class="cov8" title="1">{
+        data, err := json.Marshal(links)
+        if err != nil </span><span class="cov0" title="0">{
+                fmt.Println("Error:", err)
+                return
+        }</span>
+        <span class="cov8" title="1">fmt.Println(string(data))</span>
+}
+
+// PrintLinksAsNumbered prints the links as a numbered list to stdout.
+// Each link is prefixed with its position number in the list.
+func PrintLinksAsNumbered(links []string) <span class="cov0" title="0">{
+        for i, link := range links </span><span class="cov0" title="0">{
+                fmt.Printf("%d. %s\n", i+1, link)
+        }</span>
+}
+
+// PrintLinksAsHTML prints the links as an HTML unordered list to stdout.
+// Each link is wrapped in an anchor tag that links to itself.
+func PrintLinksAsHTML(links []string) <span class="cov0" title="0">{
+        fmt.Println("&lt;ul&gt;")
+        for _, link := range links </span><span class="cov0" title="0">{
+                fmt.Printf("&lt;li&gt;&lt;a href=\"%s\"&gt;%s&lt;/a&gt;&lt;/li&gt;\n", link, link)
+        }</span>
+        <span class="cov0" title="0">fmt.Println("&lt;/ul&gt;")</span>
+}
+
+// PrintLinksAsText prints the links as plain text to stdout.
+// Each link is printed on a new line.
+func PrintLinksAsText(links []string) <span class="cov8" title="1">{
+        for _, link := range links </span><span class="cov8" title="1">{
+                fmt.Println(link)
+        }</span>
+}
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>

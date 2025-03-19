@@ -18,7 +18,7 @@ import (
 
 	// Third-party dependencies
 	"github.com/schollz/progressbar/v3"
-	
+
 	// Internal dependencies
 	"github.com/hemzaz/lsweb/pkg/common"
 )
@@ -62,13 +62,13 @@ func FetchGitHubReleases(repoURL string, ignoreCert bool) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid URL: %w", err)
 	}
-	
+
 	// Extract path components
 	pathParts := strings.Split(strings.TrimPrefix(parsedURL.Path, "/"), "/")
 	if len(pathParts) < 2 {
 		return nil, fmt.Errorf("invalid GitHub repository URL: expected format github.com/{user}/{repo}")
 	}
-	
+
 	user, repo := pathParts[0], pathParts[1]
 	// Remove any trailing .git from repo name
 	repo = strings.TrimSuffix(repo, ".git")
@@ -87,12 +87,12 @@ func FetchGitHubReleases(repoURL string, ignoreCert bool) ([]string, error) {
 	// Create request with context
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
-	
+
 	req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
-	
+
 	// Add user-agent and accept headers required by GitHub API
 	req.Header.Set("User-Agent", common.UserAgent)
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
@@ -123,8 +123,8 @@ func FetchGitHubReleases(repoURL string, ignoreCert bool) ([]string, error) {
 	var releases []struct {
 		Assets []struct {
 			BrowserDownloadURL string `json:"browser_download_url"`
-			Name              string `json:"name"`
-			Size              int    `json:"size"`
+			Name               string `json:"name"`
+			Size               int    `json:"size"`
 		} `json:"assets"`
 		TagName string `json:"tag_name"`
 	}
@@ -156,7 +156,7 @@ func DownloadFile(url string, ignoreCert bool, showProgress bool) error {
 	// Create a context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
-	
+
 	// Create a client with timeout
 	client := &http.Client{
 		Timeout: defaultTimeout,
@@ -172,7 +172,7 @@ func DownloadFile(url string, ignoreCert bool, showProgress bool) error {
 	if err != nil {
 		return fmt.Errorf("error creating request: %w", err)
 	}
-	
+
 	// Add a user-agent to be polite
 	req.Header.Set("User-Agent", common.UserAgent)
 
@@ -185,7 +185,7 @@ func DownloadFile(url string, ignoreCert bool, showProgress bool) error {
 			fmt.Printf("Error closing response body: %v\n", closeErr)
 		}
 	}()
-	
+
 	// Check for successful status code
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("server returned non-success status: %d %s", resp.StatusCode, resp.Status)
@@ -197,14 +197,14 @@ func DownloadFile(url string, ignoreCert bool, showProgress bool) error {
 	}
 
 	filename := filepath.Base(url)
-	
+
 	// Check if file already exists
 	if !allowOverwriteFiles {
 		if _, err := os.Stat(filename); err == nil {
 			return fmt.Errorf("file %s already exists, skipping download (use -overwrite to override)", filename)
 		}
 	}
-	
+
 	// Create the file
 	file, err := os.Create(filename)
 	if err != nil {
@@ -244,13 +244,13 @@ func DownloadFiles(urls []string, ignoreCert bool, showProgress bool) error {
 	if len(urls) == 0 {
 		return fmt.Errorf("no URLs to download")
 	}
-	
+
 	// Create a context with timeout for the entire operation
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
-	
+
 	var failedCount int
-	
+
 	for i, url := range urls {
 		// Check for context cancellation between downloads
 		select {
@@ -259,7 +259,7 @@ func DownloadFiles(urls []string, ignoreCert bool, showProgress bool) error {
 		default:
 			// Continue with download
 		}
-		
+
 		fmt.Printf("[%d/%d] Downloading: %s\n", i+1, len(urls), url)
 		err := DownloadFile(url, ignoreCert, showProgress)
 		if err != nil {
@@ -270,19 +270,19 @@ func DownloadFiles(urls []string, ignoreCert bool, showProgress bool) error {
 			// Add a newline after progress bar completes
 			fmt.Println()
 		}
-		
+
 		// Add a small delay between downloads to be kind to servers
 		if i < len(urls)-1 {
 			time.Sleep(500 * time.Millisecond)
 		}
 	}
-	
+
 	fmt.Printf("Download complete: %d/%d files\n", len(urls)-failedCount, len(urls))
-	
+
 	if failedCount > 0 {
 		return fmt.Errorf("%d/%d downloads failed", failedCount, len(urls))
 	}
-	
+
 	return nil
 }
 
@@ -299,13 +299,13 @@ func DownloadFilesSimultaneously(urls []string, ignoreCert bool, showProgress bo
 	// Create a semaphore to limit concurrency
 	maxConcurrent := maxConcurrentDownloads
 	sem := make(chan struct{}, maxConcurrent)
-	
+
 	// Use a mutex to protect file creation
 	var mu sync.Mutex
-	
+
 	// Track errors
 	errorChan := make(chan error, len(urls))
-	
+
 	var wg sync.WaitGroup
 	for _, url := range urls {
 		wg.Add(1)
@@ -317,11 +317,11 @@ func DownloadFilesSimultaneously(urls []string, ignoreCert bool, showProgress bo
 				<-sem
 				wg.Done()
 			}()
-			
+
 			// Use a more atomic file creation approach
 			mu.Lock()
 			filename := filepath.Base(url)
-			
+
 			// Check if file already exists
 			if !allowOverwriteFiles {
 				if _, err := os.Stat(filename); err == nil {
@@ -336,7 +336,7 @@ func DownloadFilesSimultaneously(urls []string, ignoreCert bool, showProgress bo
 				}
 			}
 			mu.Unlock()
-			
+
 			// Custom download to use our unique filename
 			client := &http.Client{
 				Timeout: defaultTimeout,
@@ -346,7 +346,7 @@ func DownloadFilesSimultaneously(urls []string, ignoreCert bool, showProgress bo
 					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 				}
 			}
-			
+
 			// Create a request with context
 			ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 			defer cancel()
@@ -355,10 +355,10 @@ func DownloadFilesSimultaneously(urls []string, ignoreCert bool, showProgress bo
 				errorChan <- fmt.Errorf("error creating request for %s: %w", url, err)
 				return
 			}
-			
+
 			// Add a user-agent to be polite
 			req.Header.Set("User-Agent", common.UserAgent)
-			
+
 			resp, err := client.Do(req)
 			if err != nil {
 				errorChan <- fmt.Errorf("error downloading %s: %w", url, err)
@@ -369,13 +369,13 @@ func DownloadFilesSimultaneously(urls []string, ignoreCert bool, showProgress bo
 					fmt.Printf("Error closing response body: %v\n", closeErr)
 				}
 			}()
-			
+
 			// Check for successful status code
 			if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 				errorChan <- fmt.Errorf("server returned non-success status for %s: %d %s", url, resp.StatusCode, resp.Status)
 				return
 			}
-			
+
 			file, err := os.Create(filename)
 			if err != nil {
 				errorChan <- fmt.Errorf("error creating file %s: %w", filename, err)
@@ -386,7 +386,7 @@ func DownloadFilesSimultaneously(urls []string, ignoreCert bool, showProgress bo
 					fmt.Printf("Error closing file: %v\n", closeErr)
 				}
 			}()
-			
+
 			if showProgress {
 				bar := progressbar.DefaultBytes(
 					resp.ContentLength,
@@ -403,23 +403,23 @@ func DownloadFilesSimultaneously(urls []string, ignoreCert bool, showProgress bo
 			}
 		}(url)
 	}
-	
+
 	// Wait for all downloads to complete
 	wg.Wait()
 	close(errorChan)
-	
+
 	// Collect errors
 	var downloadErrors []string
 	for err := range errorChan {
 		downloadErrors = append(downloadErrors, err.Error())
 	}
-	
+
 	if len(downloadErrors) > 0 {
 		// Return a concatenated error with all details
-		return fmt.Errorf("%d download(s) failed. Errors: %s", 
-			len(downloadErrors), 
+		return fmt.Errorf("%d download(s) failed. Errors: %s",
+			len(downloadErrors),
 			strings.Join(downloadErrors, "; "))
 	}
-	
+
 	return nil
 }

@@ -15,7 +15,7 @@ import (
 	"strings"
 
 	"golang.org/x/net/html"
-	
+
 	"github.com/hemzaz/lsweb/pkg/common"
 )
 
@@ -33,17 +33,17 @@ func ExtractLinksFromURL(targetURL string, ignoreCert bool) ([]string, error) {
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
 	}
-	
+
 	// Create context for the request
 	ctx, cancel := context.WithTimeout(context.Background(), common.DefaultTimeout)
 	defer cancel()
-	
+
 	// Create request with context
 	req, err := http.NewRequestWithContext(ctx, "GET", targetURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
-	
+
 	// Add a user-agent to be polite
 	req.Header.Set("User-Agent", common.UserAgent)
 
@@ -60,25 +60,25 @@ func ExtractLinksFromURL(targetURL string, ignoreCert bool) ([]string, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("server returned non-success status: %d %s", resp.StatusCode, resp.Status)
 	}
-	
+
 	// Check content type - only process recognized types
 	contentType := resp.Header.Get("Content-Type")
-	if !strings.Contains(contentType, "text/html") && 
-		!strings.Contains(contentType, "application/json") && 
-		!strings.Contains(contentType, "application/xml") && 
+	if !strings.Contains(contentType, "text/html") &&
+		!strings.Contains(contentType, "application/json") &&
+		!strings.Contains(contentType, "application/xml") &&
 		!strings.Contains(contentType, "text/xml") {
 		return nil, fmt.Errorf("unsupported content type: %s", contentType)
 	}
-	
+
 	// Limit body size for safety
 	bodyBytes, err := io.ReadAll(io.LimitReader(resp.Body, common.MaxContentSize))
 	if err != nil {
 		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
-	
+
 	// Different handling based on content type
 	var links []string
-	
+
 	if strings.Contains(contentType, "application/json") {
 		// For JSON content, try to extract URLs from JSON structure
 		var jsonData interface{}
@@ -89,26 +89,26 @@ func ExtractLinksFromURL(targetURL string, ignoreCert bool) ([]string, error) {
 	} else {
 		// Create a new reader from the bytes
 		bodyReader := bytes.NewReader(bodyBytes)
-		
+
 		// Parse HTML for links
 		doc, err := html.Parse(bodyReader)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing HTML: %w", err)
 		}
-		
+
 		// Extract links from HTML
 		var malformedURLs []string
 		links, malformedURLs = extractLinksFromHTML(doc, resp.Request.URL)
-		
+
 		if len(malformedURLs) > 0 {
 			// Continue with the links we found, but warn about malformed ones
 			fmt.Printf("Warning: %d malformed URLs detected\n", len(malformedURLs))
 		}
 	}
-	
+
 	// Remove duplicates
 	links = removeDuplicateLinks(links)
-	
+
 	return links, nil
 }
 
@@ -116,10 +116,10 @@ func ExtractLinksFromURL(targetURL string, ignoreCert bool) ([]string, error) {
 func extractLinksFromHTML(doc *html.Node, baseURL *url.URL) ([]string, []string) {
 	var links []string
 	var malformedURLs []string
-	
+
 	// Use a map to track visited URLs for deduplication
 	visited := make(map[string]bool)
-	
+
 	// Use a function to traverse the DOM
 	var traverse func(*html.Node)
 	traverse = func(n *html.Node) {
@@ -132,17 +132,17 @@ func extractLinksFromHTML(doc *html.Node, baseURL *url.URL) ([]string, []string)
 						malformedURLs = append(malformedURLs, a.Val)
 						continue
 					}
-					
+
 					absoluteURL = baseURL.ResolveReference(absoluteURL)
 					urlStr := absoluteURL.String()
-					
+
 					// Skip javascript: and mailto: links
-					if strings.HasPrefix(urlStr, "javascript:") || 
-					   strings.HasPrefix(urlStr, "mailto:") || 
-					   strings.HasPrefix(urlStr, "#") {
+					if strings.HasPrefix(urlStr, "javascript:") ||
+						strings.HasPrefix(urlStr, "mailto:") ||
+						strings.HasPrefix(urlStr, "#") {
 						continue
 					}
-					
+
 					// Add to links if not already visited
 					if !visited[urlStr] {
 						visited[urlStr] = true
@@ -151,13 +151,13 @@ func extractLinksFromHTML(doc *html.Node, baseURL *url.URL) ([]string, []string)
 				}
 			}
 		}
-		
+
 		// Traverse children
 		for c := n.FirstChild; c != nil; c = c.NextSibling {
 			traverse(c)
 		}
 	}
-	
+
 	traverse(doc)
 	return links, malformedURLs
 }
@@ -166,13 +166,13 @@ func extractLinksFromHTML(doc *html.Node, baseURL *url.URL) ([]string, []string)
 func extractLinksFromJSON(data interface{}) []string {
 	var links []string
 	var extract func(interface{})
-	
+
 	// Use a map to track visited URLs for deduplication
 	visited := make(map[string]bool)
-	
+
 	// Define URL regex pattern
 	urlPattern := regexp.MustCompile(`https?://[^\s"']+`)
-	
+
 	extract = func(v interface{}) {
 		switch val := v.(type) {
 		case map[string]interface{}:
@@ -196,7 +196,7 @@ func extractLinksFromJSON(data interface{}) []string {
 			}
 		}
 	}
-	
+
 	extract(data)
 	return links
 }
@@ -205,14 +205,14 @@ func extractLinksFromJSON(data interface{}) []string {
 func removeDuplicateLinks(links []string) []string {
 	seen := make(map[string]bool)
 	result := []string{}
-	
+
 	for _, link := range links {
 		if !seen[link] {
 			seen[link] = true
 			result = append(result, link)
 		}
 	}
-	
+
 	return result
 }
 
@@ -226,12 +226,12 @@ func ExtractLinksFromFile(filePath string) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error checking file: %w", err)
 	}
-	
+
 	// Limit file size to 10MB
 	if fileInfo.Size() > 10*1024*1024 {
 		return nil, fmt.Errorf("file too large (%.2f MB). Maximum size is 10MB", float64(fileInfo.Size())/(1024*1024))
 	}
-	
+
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("error opening file: %w", err)
@@ -248,24 +248,24 @@ func ExtractLinksFromFile(filePath string) ([]string, error) {
 	if err != nil && err != io.EOF {
 		return nil, fmt.Errorf("error reading file header: %w", err)
 	}
-	
+
 	// Reset file position
 	_, err = file.Seek(0, 0)
 	if err != nil {
 		return nil, fmt.Errorf("error resetting file position: %w", err)
 	}
-	
+
 	// Detect content type
 	contentType := http.DetectContentType(header)
-	
+
 	// Read the entire file
 	content, err := io.ReadAll(file)
 	if err != nil {
 		return nil, fmt.Errorf("error reading file content: %w", err)
 	}
-	
+
 	var links []string
-	
+
 	// Process based on content type
 	if strings.Contains(contentType, "text/html") {
 		// Parse HTML
@@ -273,28 +273,28 @@ func ExtractLinksFromFile(filePath string) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error parsing HTML: %w", err)
 		}
-		
+
 		// Create a base URL for resolving relative links
 		baseURL, _ := url.Parse("file://" + filePath)
-		
+
 		// Extract links
 		links, _ = extractLinksFromHTML(doc, baseURL)
-		
+
 	} else if strings.Contains(contentType, "application/json") {
 		// Parse JSON
 		var jsonData interface{}
 		if err := json.Unmarshal(content, &jsonData); err != nil {
 			return nil, fmt.Errorf("error parsing JSON: %w", err)
 		}
-		
+
 		// Extract links from JSON
 		links = extractLinksFromJSON(jsonData)
-		
+
 	} else if strings.Contains(contentType, "text/plain") {
 		// For plain text, look for URLs using regex
 		urlPattern := regexp.MustCompile(`https?://[^\s"']+`)
 		matches := urlPattern.FindAllString(string(content), -1)
-		
+
 		// Remove duplicates
 		seen := make(map[string]bool)
 		for _, match := range matches {
